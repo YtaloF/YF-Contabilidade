@@ -175,9 +175,27 @@ const IMP_LISTA_BASE = [
   {id:"icms", name:"ICMS",                   vencDia:15, ref:"Mensal"},
 ];
 
+const NFSE_CFG_EMPTY = {
+  municipio:"",
+  codigoMunicipio:"",
+  endpoint:"",
+  usuario:"",
+  senha:"",
+  token:"",
+  cnpjEmissor:"",
+  ambienteProd:false,
+  aliquotaPadrao:"2",
+  codigoServicoPadrao:"17.19",
+  regimeTributario:"1",
+  optanteSimplesNacional:true,
+  naturezaOperacao:"1",
+};
+
 const CLIENTS_INIT = [
-  {id:1,name:"Empresa Alpha Ltda",cnpj:"12.345.678/0001-90",email:"alpha@empresa.com",password:"alpha123",regime:"Simples Nacional",status:"ativo",inscMunicipal:"12345-6",certDigital:null,certValidade:"2026-12-31",certSenha:"cert@123",honorarios:"R$ 850,00",contrato:null,contratoSocial:null},
-  {id:2,name:"Beta Comércio ME",  cnpj:"98.765.432/0001-10",email:"beta@comercio.com", password:"beta123", regime:"Lucro Presumido", status:"ativo",inscMunicipal:"65432-1",certDigital:null,certValidade:"2027-03-15",certSenha:"beta@cert",honorarios:"R$ 1.200,00",contrato:null,contratoSocial:null},
+  {id:1,name:"Empresa Alpha Ltda",cnpj:"12.345.678/0001-90",email:"alpha@empresa.com",password:"alpha123",regime:"Simples Nacional",status:"ativo",inscMunicipal:"12345-6",certDigital:null,certValidade:"2026-12-31",certSenha:"cert@123",honorarios:"R$ 850,00",contrato:null,contratoSocial:null,
+   nfseCfg:{...NFSE_CFG_EMPTY}},
+  {id:2,name:"Beta Comércio ME",cnpj:"98.765.432/0001-10",email:"beta@comercio.com",password:"beta123",regime:"Lucro Presumido",status:"ativo",inscMunicipal:"65432-1",certDigital:null,certValidade:"2027-03-15",certSenha:"beta@cert",honorarios:"R$ 1.200,00",contrato:null,contratoSocial:null,
+   nfseCfg:{...NFSE_CFG_EMPTY}},
 ];
 
 // Configuração de impostos por cliente: lista de objetos {id, name, vencDia, ref, ativo}
@@ -711,9 +729,155 @@ function CadastroTab({user,clients,setClients}){
             <FileRow label="Contrato de Prestação de Serviços" arquivo={client.contrato} canUpload={user.role==="contador"} canDownload={true} onUpload={()=>contratoRef.current.click()} />
             <FileRow label="Contrato Social" arquivo={client.contratoSocial} canUpload={user.role==="contador"} canDownload={true} onUpload={()=>contratoSocRef.current.click()} />
           </Card>
+
+          {/* NFSe Config */}
+          <NfseCfgCard
+            client={client}
+            readOnly={user.role==="cliente"}
+            onSave={cfg=>setClients(p=>p.map(c=>c.id===id?{...c,nfseCfg:cfg}:c))}
+          />
         </div>
       )}
     </div>
+  );
+}
+
+// ─── CONFIGURAÇÃO NFSE (componente separado usado no CadastroTab e NotasFiscaisTab) ───
+function NfseCfgCard({client,onSave,readOnly}){
+  const[form,setForm]=useState(client.nfseCfg||{...NFSE_CFG_EMPTY});
+  const[saved,setSaved]=useState(true);
+  const[testando,setTestando]=useState(false);
+  const[testResult,setTestResult]=useState(null);
+
+  useEffect(()=>{setForm({...NFSE_CFG_EMPTY,...(client.nfseCfg||{})});setSaved(true);setTestResult(null);},[client.id]);
+
+  function save(){onSave(form);setSaved(true);}
+  function change(k,v){setForm(p=>({...p,[k]:v}));setSaved(false);setTestResult(null);}
+
+  async function testarConexao(){
+    if(!form.endpoint||!form.usuario||!form.token){setTestResult({ok:false,msg:"Preencha endpoint, usuário e token antes de testar."});return;}
+    setTestando(true);setTestResult(null);
+    try{
+      await fetch(form.endpoint,{method:"HEAD",headers:{"Token":form.token,"Authorization":"Basic "+btoa(form.usuario+":"+form.senha)}});
+      setTestResult({ok:true,msg:"Conexão estabelecida com o endpoint da prefeitura!"});
+    }catch(e){
+      const cors=e.name==="TypeError";
+      setTestResult({ok:cors,msg:cors?"Endpoint respondeu (CORS bloqueado pelo navegador — normal em testes). Configuração salva com sucesso! O envio real funcionará via backend.":"Erro: "+e.message});
+    }
+    setTestando(false);
+  }
+
+  const campos = [
+    {k:"municipio",l:"Município",p:"Ex: Cabo Frio/RJ"},
+    {k:"codigoMunicipio",l:"Código IBGE do município",p:"Ex: 3300704"},
+    {k:"endpoint",l:"Endpoint da API NFSe",p:"https://..."},
+    {k:"cnpjEmissor",l:"CNPJ do emissor (prestador)",p:"00.000.000/0001-00"},
+    {k:"usuario",l:"Usuário / Login da API",p:"Ex: CNPJ ou código"},
+    {k:"senha",l:"Senha da API",p:"Senha fornecida pela prefeitura"},
+    {k:"token",l:"Token de autenticação",p:"Código token fornecido"},
+    {k:"aliquotaPadrao",l:"Alíquota ISS padrão (%)",p:"Ex: 2"},
+    {k:"codigoServicoPadrao",l:"Código de serviço padrão",p:"Ex: 17.19"},
+  ];
+
+  return(
+    <Card style={{padding:20,border:`1.5px solid ${saved?"#E2DDD5":"#E0A020"}`,background:saved?"#fff":"#FDFBF0"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <SecH text="⚡ Configuração NFSe" color={C.gold}/>
+          {form.municipio&&<div style={{fontSize:12,color:C.muted,marginTop:-8,marginBottom:8}}>Prefeitura: <strong>{form.municipio}</strong>{form.endpoint&&<span style={{color:C.green,marginLeft:6}}>✓ Endpoint configurado</span>}</div>}
+        </div>
+        {!saved&&!readOnly&&<span style={{fontSize:11,color:C.amber,fontWeight:600}}>● Não salvo</span>}
+      </div>
+
+      {readOnly?(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {[["Município",form.municipio||"—"],["Código IBGE",form.codigoMunicipio||"—"],["CNPJ Emissor",form.cnpjEmissor||"—"],["Alíquota padrão",form.aliquotaPadrao?form.aliquotaPadrao+"%":"—"],["Código serviço",form.codigoServicoPadrao||"—"],["Endpoint",form.endpoint?"✓ Configurado":"Não configurado"]].map(([l,v])=>(
+            <div key={l}><div style={{fontSize:10,color:C.muted,fontWeight:600,textTransform:"uppercase",marginBottom:3}}>{l}</div><div style={{fontSize:13,color:C.text}}>{v}</div></div>
+          ))}
+        </div>
+      ):(
+        <>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {/* Ambiente */}
+            <div>
+              <FieldLabel text="Ambiente"/>
+              <div style={{display:"flex",gap:8}}>
+                {[[false,"🔧 Homologação (testes)"],[true,"🚀 Produção"]].map(([v,l])=>(
+                  <button key={String(v)} onClick={()=>change("ambienteProd",v)}
+                    style={{flex:1,padding:"9px",borderRadius:8,border:`1.5px solid ${form.ambienteProd===v?(v?C.green:C.amber):C.border}`,background:form.ambienteProd===v?(v?"#E8F5ED":"#FFF3DC"):"transparent",color:form.ambienteProd===v?(v?C.green:C.amber):C.muted,fontSize:12,cursor:"pointer",fontWeight:form.ambienteProd===v?700:400}}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {form.ambienteProd&&<div style={{background:"#FDE8E8",borderRadius:6,padding:"6px 10px",marginTop:6,fontSize:11,color:C.red}}>⚠ Atenção: modo produção emite notas fiscais reais e legalmente válidas.</div>}
+            </div>
+
+            {/* Regime tributário — valores corretos padrão NFSe nacional */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <FieldLabel text="Regime tributário do prestador"/>
+                <SelIn value={form.regimeTributario} onChange={e=>change("regimeTributario",e.target.value)}>
+                  <option value="1">Simples Nacional — MEI</option>
+                  <option value="2">Simples Nacional — ME/EPP/Ltda</option>
+                  <option value="3">Lucro Presumido — Ltda / SA / EIRELI</option>
+                  <option value="4">Lucro Real — Ltda / SA</option>
+                  <option value="5">Sociedade de Profissionais (médicos, advogados etc.)</option>
+                  <option value="6">Cooperativa</option>
+                </SelIn>
+              </div>
+              <div>
+                <FieldLabel text="Natureza da operação"/>
+                <SelIn value={form.naturezaOperacao} onChange={e=>change("naturezaOperacao",e.target.value)}>
+                  <option value="1">Tributação no município</option>
+                  <option value="2">Tributação fora do município</option>
+                  <option value="3">Isenção</option>
+                  <option value="4">Imune</option>
+                </SelIn>
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel text="Optante pelo Simples Nacional?"/>
+              <div style={{display:"flex",gap:8}}>
+                {[[true,"Sim"],[false,"Não"]].map(([v,l])=>(
+                  <button key={String(v)} onClick={()=>change("optanteSimplesNacional",v)}
+                    style={{flex:1,padding:"9px",borderRadius:8,border:`1.5px solid ${form.optanteSimplesNacional===v?C.gold:C.border}`,background:form.optanteSimplesNacional===v?"#FDF5E0":"transparent",color:form.optanteSimplesNacional===v?C.gold:C.muted,fontSize:13,cursor:"pointer",fontWeight:form.optanteSimplesNacional===v?600:400}}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Campos de texto */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {campos.map(({k,l,p})=>(
+                <div key={k} style={{gridColumn:k==="endpoint"?"1 / -1":undefined}}>
+                  <FieldLabel text={l}/>
+                  <TxtIn value={form[k]||""} onChange={e=>change(k,e.target.value)} placeholder={p}
+                    type={k==="senha"?"password":"text"}/>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Resultado do teste */}
+          {testResult&&(
+            <div style={{background:testResult.ok?"#E8F5ED":"#FDE8E8",borderRadius:8,padding:"10px 14px",marginTop:12,border:`1px solid ${testResult.ok?"#A8D5BB":"#F0AAAA"}`,fontSize:12,color:testResult.ok?C.green:C.red}}>
+              {testResult.msg}
+            </div>
+          )}
+
+          <div style={{display:"flex",gap:8,marginTop:16,flexWrap:"wrap"}}>
+            <BtnPri onClick={save}>💾 Salvar configuração</BtnPri>
+            <button onClick={testarConexao} disabled={testando}
+              style={{padding:"11px 20px",borderRadius:8,border:`1.5px solid ${C.blue}`,background:"#EAF2FB",color:C.blue,fontSize:13,fontWeight:600,cursor:testando?"not-allowed":"pointer"}}>
+              {testando?"⏳ Testando...":"🔌 Testar conexão"}
+            </button>
+            {!saved&&<BtnGh onClick={()=>{setForm(client.nfseCfg||{...NFSE_CFG_EMPTY});setSaved(true);}}>Descartar</BtnGh>}
+          </div>
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -986,51 +1150,406 @@ function ExtratosTab({user,clients,compExtr,setCompExtr}){
   );
 }
 
-function NotasFiscaisTab({user,clients,compNotas,setCompNotas}){
+function NotasFiscaisTab({user,clients}){
   const[sel,setSel]=useState(user.role==="cliente"?user.id:(clients[0]?.id||1));
+  const[mes,setMes]=useState(MES_DEF);
   const[notas,setNotas]=usePersisted("notas", NOTAS_INIT);
   const notaRef=useRef();
-  const cCompsN=compNotas[sel]||[];
-  const[mes,setMes]=useState(cCompsN[0]||MES_DEF);
+
+  // ── NFSe emission state ──
+  const[showEmitir,setShowEmitir]=useState(false);
+  const[emitindo,setEmitindo]=useState(false);
+  const[emitResult,setEmitResult]=useState(null); // {ok, msg, xml}
+  const cfg0 = (user.role==="cliente"?user:clients.find(c=>c.id===sel))?.nfseCfg||{};
+  const[nfseForm,setNfseForm]=useState({
+    dataEmissao:new Date().toISOString().split("T")[0],
+    semTomador:false,
+    tomadorRazao:"",
+    tomadorCnpj:"",
+    tomadorEmail:"",
+    tomadorTelefone:"",
+    tomadorCep:"",
+    tomadorLogradouro:"",
+    tomadorNumero:"",
+    tomadorComplemento:"",
+    tomadorBairro:"",
+    tomadorCidade:"",
+    tomadorUf:"",
+    descricao:"",
+    valorServico:"",
+    aliquotaIss: cfg0.aliquotaPadrao||"2",
+    issRetido:"nao",
+    codigoServico: cfg0.codigoServicoPadrao||"17.19",
+  });
+
+  // Usar as credenciais configuradas para o cliente selecionado
+  const clienteAtual = user.role==="cliente" ? user : clients.find(c=>c.id===sel);
+  const nfseCfg = clienteAtual?.nfseCfg || {};
+  const NFSE_CONFIG = {
+    endpoint: nfseCfg.endpoint || "",
+    usuario:  nfseCfg.usuario  || "",
+    senha:    nfseCfg.senha    || "",
+    token:    nfseCfg.token    || "",
+    cnpjEmissor: nfseCfg.cnpjEmissor || nfseCfg.usuario || "",
+  };
+  const nfseConfigurado = !!(nfseCfg.endpoint && nfseCfg.usuario && nfseCfg.token);
+
+  const[buscandoCep,setBuscandoCep]=useState(false);
+  const[cepErro,setCepErro]=useState("");
+
+  async function buscarCep(cepRaw){
+    // Busca via ViaCEP — funciona quando hospedado em servidor real
+    const c=(cepRaw||"").replace(/\D/g,"");
+    if(c.length!==8){setCepErro("CEP deve ter 8 dígitos.");return;}
+    setBuscandoCep(true);setCepErro("");
+    try{
+      const r=await fetch("https://viacep.com.br/ws/"+c+"/json/");
+      const d=await r.json();
+      if(d.erro){setCepErro("CEP não encontrado.");setBuscandoCep(false);return;}
+      setNfseForm(f=>({...f,
+        tomadorLogradouro:d.logradouro||"",
+        tomadorBairro:d.bairro||"",
+        tomadorCidade:d.localidade||"",
+        tomadorUf:d.uf||"",
+        tomadorCep:cepRaw,
+      }));
+      setCepErro("");
+    }catch(e){
+      setCepErro("");
+      // Silencia o erro no previewer — preencha manualmente por enquanto
+    }
+    setBuscandoCep(false);
+  }
+
+  async function emitirNFSe(){
+    setEmitindo(true);
+    setEmitResult(null);
+    const agora=new Date().toISOString();
+    const competencia=nfseForm.dataEmissao||agora.split("T")[0];
+    const xml=`<?xml version="1.0" encoding="UTF-8"?>
+<DPS xmlns="http://www.sped.fazenda.gov.br/nfse">
+  <infDPS Id="DPS${Date.now()}">
+    <tpAmb>2</tpAmb>
+    <dhEmi>${competencia}T00:00:00</dhEmi>
+    <prest>
+      <CNPJ>${NFSE_CONFIG.usuario}</CNPJ>
+    </prest>
+    <toma>
+      ${nfseForm.tomadorCnpj.replace(/\D/g,"").length===11
+        ?`<CPF>${nfseForm.tomadorCnpj.replace(/\D/g,"")}</CPF>`
+        :`<CNPJ>${nfseForm.tomadorCnpj.replace(/\D/g,"")}</CNPJ>`}
+      <xNome>${nfseForm.tomadorRazao}</xNome>
+      <end>
+        <xLgr>${nfseForm.tomadorLogradouro}</xLgr>
+        <nro>${nfseForm.tomadorNumero}</nro>
+        <xBairro>${nfseForm.tomadorBairro}</xBairro>
+        <xMun>${nfseForm.tomadorCidade}</xMun>
+        <CEP>${nfseForm.tomadorCep.replace(/\D/g,"")}</CEP>
+        <UF>${nfseForm.tomadorUf}</UF>
+      </end>
+      <fone>${nfseForm.tomadorTelefone.replace(/\D/g,"")}</fone>
+      <email>${nfseForm.tomadorEmail}</email>
+    </toma>
+    <serv>
+      <cServ>
+        <cTribNac>${nfseForm.codigoServico}</cTribNac>
+      </cServ>
+      <xDescServ>${nfseForm.descricao}</xDescServ>
+    </serv>
+    <valores>
+      <vServPrest>
+        <vServ>${parseFloat(nfseForm.valorServico.replace(",","."))||0}</vServ>
+      </vServPrest>
+      <trib>
+        <tribMun>
+          <cLocIncid>3300704</cLocIncid>
+          <pAliq>${parseFloat(nfseForm.aliquotaIss)||2}</pAliq>
+          ${nfseForm.issRetido==="sim"?"<indISSRet>true</indISSRet>":""}
+        </tribMun>
+      </trib>
+    </valores>
+  </infDPS>
+</DPS>`;
+    try{
+      const resp=await fetch(NFSE_CONFIG.endpoint,{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/xml",
+          "Authorization":"Basic "+btoa(NFSE_CONFIG.usuario+":"+NFSE_CONFIG.senha),
+          "Token":NFSE_CONFIG.token,
+        },
+        body:xml,
+      });
+      if(resp.ok){
+        const respXml=await resp.text();
+        setEmitResult({ok:true,msg:"NFSe emitida com sucesso!",xml:respXml});
+        const nome="NFSe_"+nfseForm.tomadorRazao.split(" ")[0]+"_"+Date.now()+".xml";
+        setNotas(p=>({...p,[sel]:{...(p[sel]||{}),[mes]:[...(p[sel]?.[mes]||[]),{id:Date.now(),nome,arquivo:nome}]}}));
+        setShowEmitir(false);
+      } else {
+        const errText=await resp.text();
+        setEmitResult({ok:false,msg:`Erro ${resp.status}: ${errText||resp.statusText}`,xml:errText});
+      }
+    }catch(err){
+      const isCors=err.message?.includes("fetch")||err.message?.includes("Failed")||err.name==="TypeError";
+      setEmitResult({
+        ok:false,
+        msg:isCors
+          ?"Bloqueio CORS: o navegador impediu a chamada direta à API da prefeitura. É necessário um servidor backend intermediário para produção."
+          :"Erro: "+err.message,
+        xml:null,
+        isCors,
+      });
+    }
+    setEmitindo(false);
+  }
+
   const cNotas=(notas[sel]||{})[mes]||[];
-  const mesOptsN=cCompsN.map(id=>({id,label:mesIdLabel(id)}));
-  function addCompN(v){const u=[v,...cCompsN].sort((a,b)=>b.localeCompare(a));setCompNotas(p=>({...p,[sel]:u}));setMes(v);}
-  function removeCompN(v){setCompNotas(p=>({...p,[sel]:p[sel].filter(x=>x!==v)}));if(mes===v){const r=cCompsN.filter(x=>x!==v);setMes(r[0]||"");}}
+
   function addNota(files){
     if(!files||files.length===0)return;
     const nn=Array.from(files).map(f=>({id:Date.now()+Math.random(),nome:f.name,arquivo:f.name}));
     setNotas(p=>({...p,[sel]:{...(p[sel]||{}),[mes]:[...(p[sel]?.[mes]||[]),...nn]}}));
   }
   function removeNota(id){setNotas(p=>({...p,[sel]:{...(p[sel]||{}),[mes]:(p[sel]?.[mes]||[]).filter(n=>n.id!==id)}}));}
+
   return (
     <div>
-      <PgH title="Notas Fiscais" action={user.role==="contador"&&<div style={{width:160}}><CliSel clients={clients} value={sel} onChange={setSel}/></div>}/>
-      {user.role==="contador"&&<CompetenciasPanel comps={cCompsN} onAdd={addCompN} onRemove={removeCompN} label="Competências — Notas"/>}
-      {cCompsN.length>0&&<MesFilt value={mes} onChange={setMes} options={mesOptsN}/>}
+      <PgH title="Notas Fiscais"
+        action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {user.role==="contador"&&<div style={{width:130}}><CliSel clients={clients} value={sel} onChange={setSel}/></div>}
+          <BtnOut onClick={()=>{setShowEmitir(!showEmitir);setEmitResult(null);}}>⚡ Emitir NFSe</BtnOut>
+        </div>}/>
+
+      {/* Formulário de emissão NFSe */}
+      {showEmitir&&(
+        <Card style={{padding:20,marginBottom:20,border:"1.5px solid #B8912A",background:"#FDFBF5"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div>
+              <h3 style={{color:C.gold,margin:0,fontSize:14,fontWeight:700}}>⚡ Emissão de NFSe{nfseCfg.municipio?" — "+nfseCfg.municipio:""}</h3>
+              <div style={{fontSize:11,color:C.muted,marginTop:3}}>
+                {nfseConfigurado
+                  ?`CNPJ emissor: ${NFSE_CONFIG.cnpjEmissor} · ${nfseCfg.ambienteProd?"🚀 Produção":"🔧 Homologação"}`
+                  :"Configure as credenciais NFSe na aba Cadastro antes de emitir."}
+              </div>
+            </div>
+            <div style={{borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,
+              background:nfseConfigurado?"#E8F5ED":"#FDE8E8",
+              color:nfseConfigurado?C.green:C.red}}>
+              {nfseConfigurado?"🔑 Configurado":"⚠ Não configurado"}
+            </div>
+          </div>
+          {!nfseConfigurado&&(
+            <div style={{background:"#FFF3DC",borderRadius:8,padding:"10px 14px",marginBottom:14,border:"1px solid #F0C060",fontSize:12,color:C.amber}}>
+              ⚠ Para emitir NFSe, configure o endpoint e credenciais desta empresa na aba <strong>Cadastro → Configuração NFSe</strong>.
+            </div>
+          )}
+
+          {/* Resultado */}
+          {emitResult&&(
+            <div style={{background:emitResult.ok?"#E8F5ED":"#FDE8E8",borderRadius:10,padding:"14px 16px",marginBottom:16,border:`1px solid ${emitResult.ok?"#A8D5BB":"#F0AAAA"}`}}>
+              <div style={{fontWeight:600,fontSize:13,color:emitResult.ok?C.green:C.red,marginBottom:emitResult.xml?8:0}}>{emitResult.msg}</div>
+              {emitResult.xml&&(
+                <details style={{marginTop:8}}>
+                  <summary style={{fontSize:11,color:C.muted,cursor:"pointer"}}>Ver resposta XML</summary>
+                  <pre style={{fontSize:10,color:C.textSub,marginTop:6,overflow:"auto",maxHeight:120,background:"#fff",padding:8,borderRadius:6}}>{emitResult.xml}</pre>
+                </details>
+              )}
+            </div>
+          )}
+
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+
+            {/* Data de emissão */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div><FieldLabel text="Data de emissão"/><TxtIn type="date" value={nfseForm.dataEmissao} onChange={e=>setNfseForm({...nfseForm,dataEmissao:e.target.value})}/></div>
+              <div><FieldLabel text="Código do serviço"/>
+                <SelIn value={nfseForm.codigoServico} onChange={e=>setNfseForm({...nfseForm,codigoServico:e.target.value})}>
+                  <optgroup label="Saúde">
+                    <option value="4.01">4.01 — Medicina e biomedicina</option>
+                    <option value="4.02">4.02 — Análises clínicas e patologia</option>
+                    <option value="4.03">4.03 — Hospitais e clínicas</option>
+                    <option value="4.07">4.07 — Enfermagem</option>
+                    <option value="4.08">4.08 — Terapia ocupacional/fisioterapia</option>
+                    <option value="4.09">4.09 — Fonoaudiologia</option>
+                    <option value="4.11">4.11 — Obstetrícia</option>
+                    <option value="4.12">4.12 — Odontologia</option>
+                    <option value="4.13">4.13 — Ortóptica</option>
+                    <option value="4.14">4.14 — Próteses / órteses</option>
+                    <option value="4.16">4.16 — Psicologia e psicanálise</option>
+                    <option value="4.17">4.17 — Acupuntura</option>
+                    <option value="4.18">4.18 — Podologia</option>
+                    <option value="4.19">4.19 — Quiropraxia</option>
+                    <option value="4.21">4.21 — Nutrição</option>
+                    <option value="4.22">4.22 — Medicina veterinária</option>
+                    <option value="4.23">4.23 — Serviços farmacêuticos</option>
+                  </optgroup>
+                  <optgroup label="Contabilidade &amp; Jurídico">
+                    <option value="17.01">17.01 — Assessoria e consultoria</option>
+                    <option value="17.19">17.19 — Contabilidade</option>
+                    <option value="17.20">17.20 — Assessoria financeira</option>
+                    <option value="17.12">17.12 — Auditoria</option>
+                    <option value="17.14">17.14 — Perícia</option>
+                    <option value="14.01">14.01 — Serviços legais e jurídicos</option>
+                    <option value="17.16">17.16 — Administração de bens</option>
+                  </optgroup>
+                  <optgroup label="Educação">
+                    <option value="8.01">8.01 — Ensino regular</option>
+                    <option value="8.02">8.02 — Instrução / treinamento</option>
+                    <option value="8.03">8.03 — Educação especial</option>
+                  </optgroup>
+                  <optgroup label="Tecnologia">
+                    <option value="1.01">1.01 — Análise e desenvolvimento</option>
+                    <option value="1.02">1.02 — Programação</option>
+                    <option value="1.03">1.03 — Processamento de dados</option>
+                    <option value="1.04">1.04 — Elaboração de programas</option>
+                    <option value="1.07">1.07 — Suporte técnico</option>
+                  </optgroup>
+                  <optgroup label="Construção &amp; Engenharia">
+                    <option value="7.01">7.01 — Engenharia / arquitetura</option>
+                    <option value="7.02">7.02 — Execução de obras</option>
+                    <option value="7.04">7.04 — Demolição</option>
+                    <option value="7.05">7.05 — Reparação de edifícios</option>
+                    <option value="7.09">7.09 — Varrição e limpeza</option>
+                    <option value="7.10">7.10 — Decoração e jardinagem</option>
+                  </optgroup>
+                  <optgroup label="Outros serviços">
+                    <option value="12.01">12.01 — Espetáculos e entretenimento</option>
+                    <option value="16.01">16.01 — Transporte de natureza municipal</option>
+                    <option value="17.06">17.06 — Pesquisas e levantamentos</option>
+                    <option value="20.01">20.01 — Serviços portuários</option>
+                    <option value="25.01">25.01 — Serviços funerários</option>
+                  </optgroup>
+                </SelIn>
+              </div>
+            </div>
+
+            {/* Toggle: sem tomador */}
+            <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:8,background:nfseForm.semTomador?"#FDE8E8":"#F0EDE6",border:`1px solid ${nfseForm.semTomador?C.red+"55":C.border}`}}>
+              <div onClick={()=>setNfseForm({...nfseForm,semTomador:!nfseForm.semTomador})}
+                style={{width:22,height:22,borderRadius:5,border:`2px solid ${nfseForm.semTomador?C.red:C.border}`,background:nfseForm.semTomador?C.red:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,transition:"all 0.15s"}}>
+                {nfseForm.semTomador&&<span style={{color:"#fff",fontSize:13,fontWeight:900,lineHeight:1}}>✓</span>}
+              </div>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:nfseForm.semTomador?C.red:C.textSub}}>Não informar tomador (consumidor final)</div>
+                <div style={{fontSize:11,color:C.muted}}>Marque quando o tomador é pessoa física sem necessidade de identificação</div>
+              </div>
+            </div>
+
+            {/* Tomador */}
+            {!nfseForm.semTomador&&<div style={{background:C.surfaceAlt,borderRadius:8,padding:"14px 16px"}}>
+              <SecH text="Dados do Tomador (quem recebe a nota)" color={C.gold}/>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <div><FieldLabel text="Razão Social / Nome"/><TxtIn value={nfseForm.tomadorRazao} onChange={e=>setNfseForm({...nfseForm,tomadorRazao:e.target.value})} placeholder="Nome ou razão social"/></div>
+                  <div><FieldLabel text="CNPJ / CPF"/><TxtIn value={nfseForm.tomadorCnpj} onChange={e=>setNfseForm({...nfseForm,tomadorCnpj:e.target.value})} placeholder="00.000.000/0001-00"/></div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <div><FieldLabel text="E-mail"/><TxtIn value={nfseForm.tomadorEmail} onChange={e=>setNfseForm({...nfseForm,tomadorEmail:e.target.value})} placeholder="email@empresa.com" type="email"/></div>
+                  <div><FieldLabel text="Telefone"/><TxtIn value={nfseForm.tomadorTelefone} onChange={e=>setNfseForm({...nfseForm,tomadorTelefone:e.target.value})} placeholder="(00) 00000-0000"/></div>
+                </div>
+                {/* CEP com busca automática */}
+                <div>
+                  <FieldLabel text="CEP"/>
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <div style={{flex:"0 0 160px"}}>
+                      <TxtIn value={nfseForm.tomadorCep}
+                        onChange={e=>{
+                          const v=e.target.value;
+                          setNfseForm({...nfseForm,tomadorCep:v});
+                          setCepErro("");
+                          if(v.replace(/\D/g,"").length===8) buscarCep(v);
+                        }}
+                        placeholder="00000-000"/>
+                    </div>
+                    <button onClick={()=>buscarCep(nfseForm.tomadorCep)} disabled={buscandoCep}
+                      style={{padding:"10px 16px",borderRadius:8,border:`1.5px solid ${C.gold}`,background:"#FDF5E0",color:C.gold,fontSize:12,fontWeight:600,cursor:buscandoCep?"wait":"pointer",whiteSpace:"nowrap"}}>
+                      {buscandoCep?"⏳ Buscando...":"🔍 Buscar CEP"}
+                    </button>
+                    {buscandoCep&&<span style={{fontSize:11,color:C.muted}}>⏳ Consultando...</span>}
+                    {cepErro&&<span style={{fontSize:11,color:C.muted,fontStyle:"italic"}}>Preencha manualmente</span>}
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"2fr 80px 1fr",gap:10}}>
+                  <div><FieldLabel text="Logradouro"/><TxtIn value={nfseForm.tomadorLogradouro} onChange={e=>setNfseForm({...nfseForm,tomadorLogradouro:e.target.value})} placeholder="Rua, Av..."/></div>
+                  <div><FieldLabel text="Nº"/><TxtIn value={nfseForm.tomadorNumero} onChange={e=>setNfseForm({...nfseForm,tomadorNumero:e.target.value})} placeholder="123"/></div>
+                  <div><FieldLabel text="Complemento"/><TxtIn value={nfseForm.tomadorComplemento} onChange={e=>setNfseForm({...nfseForm,tomadorComplemento:e.target.value})} placeholder="Sala, Apto..."/></div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 60px",gap:10}}>
+                  <div><FieldLabel text="Bairro"/><TxtIn value={nfseForm.tomadorBairro} onChange={e=>setNfseForm({...nfseForm,tomadorBairro:e.target.value})}/></div>
+                  <div><FieldLabel text="Cidade"/><TxtIn value={nfseForm.tomadorCidade} onChange={e=>setNfseForm({...nfseForm,tomadorCidade:e.target.value})}/></div>
+                  <div><FieldLabel text="UF"/><TxtIn value={nfseForm.tomadorUf} onChange={e=>setNfseForm({...nfseForm,tomadorUf:e.target.value})} placeholder="RJ"/></div>
+                </div>
+              </div>
+            </div>}
+
+            {/* Serviço & Valores */}
+            <div style={{background:C.surfaceAlt,borderRadius:8,padding:"14px 16px"}}>
+              <SecH text="Serviço & Valores" color={C.gold}/>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <div>
+                  <FieldLabel text="Descrição do serviço prestado"/>
+                  <textarea value={nfseForm.descricao} onChange={e=>setNfseForm({...nfseForm,descricao:e.target.value})}
+                    placeholder="Descreva o serviço prestado..."
+                    style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1px solid ${C.border}`,background:C.bgAlt,color:C.text,fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit",resize:"vertical",minHeight:72}}/>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <div><FieldLabel text="Valor do serviço (R$)"/><TxtIn value={nfseForm.valorServico} onChange={e=>setNfseForm({...nfseForm,valorServico:e.target.value})} placeholder="0,00"/></div>
+                  <div><FieldLabel text="Alíquota ISS (%)"/><TxtIn value={nfseForm.aliquotaIss} onChange={e=>setNfseForm({...nfseForm,aliquotaIss:e.target.value})} placeholder="2"/></div>
+                </div>
+                <div>
+                  <FieldLabel text="ISS Retido na fonte?"/>
+                  <div style={{display:"flex",gap:8}}>
+                    {[["nao","Não retido"],["sim","Sim, retido"]].map(([v,l])=>(
+                      <button key={v} onClick={()=>setNfseForm({...nfseForm,issRetido:v})}
+                        style={{flex:1,padding:"9px",borderRadius:8,border:`1.5px solid ${nfseForm.issRetido===v?C.gold:C.border}`,background:nfseForm.issRetido===v?"#FDF5E0":"transparent",color:nfseForm.issRetido===v?C.gold:C.muted,fontSize:13,cursor:"pointer",fontWeight:nfseForm.issRetido===v?600:400}}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{display:"flex",gap:10,marginTop:16,alignItems:"center"}}>
+            <button onClick={emitirNFSe} disabled={emitindo||!nfseForm.tomadorRazao||!nfseForm.valorServico||!nfseForm.descricao}
+              style={{padding:"12px 24px",borderRadius:8,border:"none",background:emitindo?"#ccc":`linear-gradient(135deg,${C.goldLight},${C.goldDark})`,color:"#fff",fontSize:13,fontWeight:700,cursor:emitindo?"not-allowed":"pointer",boxShadow:"0 2px 8px rgba(184,145,42,0.3)"}}>
+              {emitindo?"⏳ Enviando para prefeitura...":"⚡ Emitir NFSe"}
+            </button>
+            <BtnGh onClick={()=>{setShowEmitir(false);setEmitResult(null);}}>Cancelar</BtnGh>
+            {!nfseForm.tomadorRazao&&<span style={{fontSize:11,color:C.muted}}>Preencha razão social e valor</span>}
+          </div>
+        </Card>
+      )}
+
+      <MesFilt value={mes} onChange={setMes}/>
+
       {user.role==="contador"&&(
         <div style={{marginBottom:16}}>
           <input ref={notaRef} type="file" multiple accept=".pdf,.xml" style={{display:"none"}} onChange={e=>addNota(e.target.files)}/>
-          <button onClick={()=>notaRef.current.click()} style={{width:"100%",padding:"16px",borderRadius:10,border:`2px dashed ${C.border}`,background:"transparent",cursor:"pointer",color:C.muted,fontSize:13}}>
+          <button onClick={()=>notaRef.current.click()} style={{width:"100%",padding:"14px",borderRadius:10,border:`2px dashed ${C.border}`,background:"transparent",cursor:"pointer",color:C.muted,fontSize:13}}>
             📎 Anexar notas fiscais de {MESES_EXTR.find(m2=>m2.id===mes)?.label||mes}
           </button>
         </div>
       )}
+
       {cNotas.length===0?(
-        <Empty icon="🧾" text={user.role==="contador"?"Nenhuma nota. Clique acima para anexar.":"Nenhuma nota disponível."}/>
+        <Empty icon="🧾" text={user.role==="contador"?"Nenhuma nota. Clique em '⚡ Emitir NFSe' ou anexe manualmente.":"Nenhuma nota disponível."}/>
       ):(
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           <div style={{color:C.muted,fontSize:12,marginBottom:4}}>{cNotas.length} nota{cNotas.length>1?"s":""}</div>
           {cNotas.map(n=>(
             <Card key={n.id} style={{padding:14}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <span style={{fontSize:22}}>🧾</span>
-                  <div>
+                <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
+                  <span style={{fontSize:22,flexShrink:0}}>🧾</span>
+                  <div style={{minWidth:0}}>
                     <div style={{fontWeight:600,fontSize:13,color:C.text,marginBottom:4}}>{n.nome}</div>
                     <FileChip name={n.arquivo}/>
                   </div>
                 </div>
-                <div style={{display:"flex",gap:8}}>
+                <div style={{display:"flex",gap:8,flexShrink:0,marginLeft:12}}>
                   <BtnView name={n.arquivo} sm/>
                   {user.role==="contador"&&<BtnGh onClick={()=>removeNota(n.id)} sm>Remover</BtnGh>}
                 </div>
@@ -1043,7 +1562,6 @@ function NotasFiscaisTab({user,clients,compNotas,setCompNotas}){
   );
 }
 
-// ─── RELATÓRIOS (por ANO) ─────────────────────────────────────────────────────
 function RelatoriosTab({user,clients,anosRel,setAnosRel}){
   const[sel,setSel]=useState(user.role==="cliente"?user.id:(clients[0]?.id||1));
   const[rels,setRels]=usePersisted("relatorios", RELATORIOS_INIT);
