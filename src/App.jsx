@@ -516,7 +516,7 @@ function FileRow({label,arquivo,onUpload,canUpload,canDownload}){
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
-function LoginScreen({onLogin,clients}){
+function LoginScreen({onLogin,clients,contadorPw}){
   // Carregar credenciais salvas
   const savedCreds = (() => {
     try{ return JSON.parse(localStorage.getItem("yfcont_savedCreds")||"null"); }catch(e){return null;}
@@ -543,7 +543,7 @@ function LoginScreen({onLogin,clients}){
   }
   function go(){
     if(role==="contador"){
-      if(email==="y.facundo@yahoo.com.br"&&pw==="admin123"){
+      if(email==="y.facundo@yahoo.com.br"&&pw===(contadorPw||"Yf@953701")){
         if(saveLogin) localStorage.setItem("yfcont_savedCreds", JSON.stringify({role,email,pw}));
         else localStorage.removeItem("yfcont_savedCreds");
         onLogin({role:"contador",name:"YF Contabilidade"});
@@ -645,7 +645,7 @@ function LoginScreen({onLogin,clients}){
         )}
         <div style={{textAlign:"center",marginTop:16,color:C.muted,fontSize:11,lineHeight:1.9}}>
           <a href="https://yfcontabilidade.com.br" style={{color:C.gold,textDecoration:"none",fontWeight:600}}>yfcontabilidade.com.br</a><br/>
-          <span style={{opacity:0.6}}>Contador: y.facundo@yahoo.com.br / admin123</span><br/>
+          <span style={{opacity:0.6}}>Contador: y.facundo@yahoo.com.br</span><br/>
           <span style={{opacity:0.6}}>Cliente: alpha@empresa.com / alpha123</span>
         </div>
       </div>
@@ -691,7 +691,7 @@ function CadastroTab({user,clients,setClients}){
           <Card style={{padding:20}}>
             <SecH text="Dados da Empresa" color={C.gold}/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              {[["Razão Social",client.name],["CNPJ",client.cnpj],["Regime Tributário",client.regime],["Inscrição Municipal",client.inscMunicipal||"—"],["E-mail",client.email],["Honorários Mensais",client.honorarios||"—"],["Validade Cert. Digital",client.certValidade||"—"]].map(([l,v])=>(
+              {[["Razão Social",client.name],["CNPJ",client.cnpj],["Regime Tributário",client.regime],["Inscrição Municipal",client.inscMunicipal||"—"],["E-mail",client.email],["Honorários Mensais",client.honorarios||"—"]].map(([l,v])=>(
                 <div key={l}>
                   <div style={{fontSize:10,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,marginBottom:3}}>{l}</div>
                   <div style={{fontSize:14,color:C.text,fontWeight:500}}>{v}</div>
@@ -1283,8 +1283,14 @@ function NotasFiscaisTab({user,clients}){
       if(resp.ok){
         const respXml=await resp.text();
         setEmitResult({ok:true,msg:"NFSe emitida com sucesso!",xml:respXml});
-        const nome="NFSe_"+nfseForm.tomadorRazao.split(" ")[0]+"_"+Date.now()+".xml";
-        setNotas(p=>({...p,[sel]:{...(p[sel]||{}),[mes]:[...(p[sel]?.[mes]||[]),{id:Date.now(),nome,arquivo:nome}]}}));
+        // Parse response to extract nota number (simplifed)
+        const nfseNumero = (()=>{
+          try{const m=respXml.match(/<NumeroNota>(\d+)<\/NumeroNota>/);return m?m[1]:String(Date.now()).slice(-6);}
+          catch(e){return String(Date.now()).slice(-6);}
+        })();
+        const dataEmissaoFmt=nfseForm.dataEmissao||new Date().toISOString().split("T")[0];
+        const nome=dataEmissaoFmt+"_NFSe_"+nfseNumero+"_"+nfseForm.tomadorRazao.split(" ")[0]+".xml";
+        setNotas(p=>({...p,[sel]:{...(p[sel]||{}),[mes]:[...(p[sel]?.[mes]||[]),{id:Date.now(),nome,arquivo:nome,dataEmissao:dataEmissaoFmt,numero:nfseNumero}]}}));
         setShowEmitir(false);
       } else {
         const errText=await resp.text();
@@ -1306,9 +1312,26 @@ function NotasFiscaisTab({user,clients}){
 
   const cNotas=(notas[sel]||{})[mes]||[];
 
+  function parseNotaName(filename){
+    // Try to extract date and number from common NF-e/NFS-e filename patterns
+    // Patterns: 35240512345678000100550010000001231234567890.xml, NFSe_20240512_001.xml, etc.
+    const name = filename.replace(/\.xml$|\.pdf$/i,"");
+    // Try: YYYYMMDD anywhere in name
+    const dateMatch = name.match(/(20\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/);
+    const numMatch  = name.match(/[_\-](\d{3,10})[_\-.]|^(\d{44})|(\d{9,10})$/);
+    const date = dateMatch
+      ? dateMatch[1]+"-"+dateMatch[2]+"-"+dateMatch[3]
+      : new Date().toISOString().split("T")[0];
+    const num = numMatch
+      ? (numMatch[1]||numMatch[2]?.slice(-6)||numMatch[3])
+      : null;
+    const label = date + (num ? "_Nota_"+num : "_"+name.slice(0,20));
+    return {nome: label, arquivo: filename, dataEmissao: date, numero: num||""};
+  }
+
   function addNota(files){
     if(!files||files.length===0)return;
-    const nn=Array.from(files).map(f=>({id:Date.now()+Math.random(),nome:f.name,arquivo:f.name}));
+    const nn=Array.from(files).map(f=>parseNotaName(f.name));
     setNotas(p=>({...p,[sel]:{...(p[sel]||{}),[mes]:[...(p[sel]?.[mes]||[]),...nn]}}));
   }
   function removeNota(id){setNotas(p=>({...p,[sel]:{...(p[sel]||{}),[mes]:(p[sel]?.[mes]||[]).filter(n=>n.id!==id)}}));}
@@ -1837,11 +1860,13 @@ function ImpostosTab({user,clients,compImp,setCompImp}){
                         {tax.guia?(
                           <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.6)",borderRadius:6,padding:"4px 8px"}}>
                             <span>📎</span><span style={{color:C.gold,fontSize:12,fontWeight:600}}>{tax.guia}</span>
-                            {user.role==="cliente"&&<span style={{color:C.muted,fontSize:11}}>(disponível)</span>}
+                  
                             {user.role==="contador"&&<button onClick={()=>gRefs.current[gk]?.click()} style={{color:C.muted,fontSize:10,background:"transparent",border:"none",cursor:"pointer",textDecoration:"underline"}}>trocar</button>}
                           </div>
-                        ):user.role==="contador"&&(
+                        ):user.role==="contador"?(
                           <button onClick={()=>gRefs.current[gk]?.click()} style={{color:C.muted,fontSize:12,background:"rgba(255,255,255,0.6)",border:`1px dashed ${C.borderDark}`,borderRadius:6,padding:"4px 10px",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}>📎 Anexar guia PDF</button>
+                        ):(
+                          <span style={{fontSize:11,color:C.amber,background:"#FFF3DC",border:"1px solid #F0C060",borderRadius:6,padding:"3px 9px",fontWeight:600,display:"inline-block",marginTop:2}}>⏳ Aguardando Liberação</span>
                         )}
                       </div>
                       <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}>
@@ -2073,18 +2098,68 @@ function PushTab({clients}){
 }
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
+// ─── ALTERAR SENHA ────────────────────────────────────────────────────────────
+function ChangePwModal({current,onSave,onClose}){
+  const[cur,setCur]=useState("");
+  const[nw,setNw]=useState("");
+  const[nw2,setNw2]=useState("");
+  const[err,setErr]=useState("");
+  function save(){
+    if(cur!==current){setErr("Senha atual incorreta.");return;}
+    if(nw.length<6){setErr("Nova senha deve ter pelo menos 6 caracteres.");return;}
+    if(nw!==nw2){setErr("As senhas não coincidem.");return;}
+    onSave(nw);
+  }
+  return(
+    <div>
+      <h3 style={{color:"#1A1A1A",fontSize:16,fontWeight:700,margin:"0 0 6px"}}>🔑 Alterar Senha</h3>
+      <p style={{color:"#8A857E",fontSize:13,margin:"0 0 18px"}}>Senha do contador</p>
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <div>
+          <label style={{color:"#8A857E",fontSize:11,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase",display:"block",marginBottom:6}}>Senha atual</label>
+          <input type="password" value={cur} onChange={e=>setCur(e.target.value)} placeholder="••••••••"
+            style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #E2DDD5",background:"#fff",color:"#1A1A1A",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+        </div>
+        <div>
+          <label style={{color:"#8A857E",fontSize:11,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase",display:"block",marginBottom:6}}>Nova senha</label>
+          <input type="password" value={nw} onChange={e=>setNw(e.target.value)} placeholder="••••••••"
+            style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #E2DDD5",background:"#fff",color:"#1A1A1A",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+        </div>
+        <div>
+          <label style={{color:"#8A857E",fontSize:11,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase",display:"block",marginBottom:6}}>Confirmar nova senha</label>
+          <input type="password" value={nw2} onChange={e=>setNw2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&save()} placeholder="••••••••"
+            style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #E2DDD5",background:"#fff",color:"#1A1A1A",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+        </div>
+        {err&&<p style={{color:"#C0392B",fontSize:12,margin:0,background:"#FDE8E8",padding:"8px 12px",borderRadius:8}}>{err}</p>}
+        <div style={{display:"flex",gap:10,marginTop:4}}>
+          <button onClick={save}
+            style={{padding:"12px 24px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#D4AA45,#8B6914)",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",flex:1}}>
+            Salvar senha
+          </button>
+          <button onClick={onClose}
+            style={{padding:"12px 18px",borderRadius:8,border:"1px solid #E2DDD5",background:"transparent",color:"#8A857E",fontSize:13,cursor:"pointer"}}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App(){
   const[user,setUser]=useState(null);
   const[activeTab,setActiveTab]=useState("clientes");
   // Estados persistidos em localStorage — sobrevivem ao fechar o app
   const[clients,setClients]=usePersisted("clients", CLIENTS_INIT);
+  const[showChangePw,setShowChangePw]=useState(false);
+  const[contadorPw,setContadorPw]=usePersisted("contadorPw","Yf@953701");
   const[compExtr,setCompExtr]=usePersisted("compExtr", COMPETENCIAS_INIT);
   const[compNotas,setCompNotas]=usePersisted("compNotas", COMP_NOTAS_INIT);
   const[compImp,setCompImp]=usePersisted("compImp", COMP_IMP_INIT);
   const[compResumo,setCompResumo]=usePersisted("compResumo", COMP_RESUMO_INIT);
   const[anosRel,setAnosRel]=usePersisted("anosRel", ANOS_REL_INIT);
 
-  if(!user) return <LoginScreen onLogin={u=>{setUser(u);setActiveTab(u.role==="contador"?"clientes":"cadastro");}} clients={clients}/>;
+  if(!user) return <LoginScreen onLogin={u=>{setUser(u);setActiveTab(u.role==="contador"?"clientes":"cadastro");}} clients={clients} contadorPw={contadorPw}/>;
 
   const tabs=user.role==="contador"
     ?[{id:"clientes",l:"Empresas",i:"👥"},{id:"cadastro",l:"Cadastro",i:"🏢"},{id:"bancos",l:"Bancos",i:"🏦"},{id:"extratos",l:"Extratos",i:"📁"},{id:"notas",l:"Notas",i:"🧾"},{id:"impostos",l:"Impostos",i:"💰"},{id:"resumo",l:"Resumo",i:"📊"},{id:"relatorios",l:"Relatórios",i:"📋"},{id:"chat",l:"Chat",i:"💬"},{id:"push",l:"Push",i:"🔔"}]
@@ -2108,11 +2183,17 @@ export default function App(){
         {user.role==="contador"&&<span style={{color:C.muted,fontSize:12,flex:1,paddingLeft:8}}>Contador</span>}
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           {user.role==="contador"&&(
-            <button
-              onClick={()=>{if(window.confirm("Redefinir TODOS os dados para o estado inicial? Esta ação não pode ser desfeita.")){clearAllData();window.location.reload();}}}
-              style={{padding:"4px 10px",borderRadius:6,border:"1px solid #E2DDD5",background:"transparent",color:"#8A857E",fontSize:10,cursor:"pointer"}}>
-              🔄 Reset
-            </button>
+            <>
+              <button onClick={()=>setShowChangePw(true)}
+                style={{padding:"4px 10px",borderRadius:6,border:"1px solid #E2DDD5",background:"transparent",color:"#8A857E",fontSize:10,cursor:"pointer"}}>
+                🔑 Senha
+              </button>
+              <button
+                onClick={()=>{if(window.confirm("Redefinir TODOS os dados?\nEsta ação não pode ser desfeita.")){clearAllData();window.location.reload();}}}
+                style={{padding:"4px 10px",borderRadius:6,border:"1px solid #E2DDD5",background:"transparent",color:"#8A857E",fontSize:10,cursor:"pointer"}}>
+                🔄 Reset
+              </button>
+            </>
           )}
           <BtnGh onClick={()=>setUser(null)} sm>Sair</BtnGh>
         </div>
@@ -2129,16 +2210,22 @@ export default function App(){
       </div>
 
       <div style={{maxWidth:700,margin:"0 auto",padding:"20px 16px"}}>
-        {activeTab==="clientes"   &&user.role==="contador"&&<ClientesTab clients={clients} setClients={setClients}/>}
-        {activeTab==="cadastro"   &&<CadastroTab user={user} clients={clients} setClients={setClients}/>}
-        {activeTab==="bancos"     &&user.role==="contador"&&<BancosTab clients={clients}/>}
-        {activeTab==="extratos"   &&<ExtratosTab user={user} clients={clients} compExtr={compExtr} setCompExtr={setCompExtr}/>}
-        {activeTab==="notas"      &&<NotasFiscaisTab user={user} clients={clients} compNotas={compNotas} setCompNotas={setCompNotas}/>}
-        {activeTab==="impostos"   &&<ImpostosTab user={user} clients={clients} compImp={compImp} setCompImp={setCompImp}/>}
-        {activeTab==="resumo"     &&<ResumoTab user={user} clients={clients} compResumo={compResumo} setCompResumo={setCompResumo}/>}
-        {activeTab==="relatorios" &&<RelatoriosTab user={user} clients={clients} anosRel={anosRel} setAnosRel={setAnosRel}/>}
-        {activeTab==="chat"       &&<ChatTab user={user} clients={clients}/>}
-        {activeTab==="push"       &&user.role==="contador"&&<PushTab clients={clients}/>}
+        {(()=>{
+          // Clientes ativos apenas — inativos são ocultados de todas as abas exceto Empresas
+          const ac=clients.filter(c=>c.status!=="inativo");
+          return(<>
+            {activeTab==="clientes"   &&user.role==="contador"&&<ClientesTab clients={clients} setClients={setClients}/>}
+            {activeTab==="cadastro"   &&<CadastroTab user={user} clients={ac} setClients={setClients}/>}
+            {activeTab==="bancos"     &&user.role==="contador"&&<BancosTab clients={ac}/>}
+            {activeTab==="extratos"   &&<ExtratosTab user={user} clients={ac} compExtr={compExtr} setCompExtr={setCompExtr}/>}
+            {activeTab==="notas"      &&<NotasFiscaisTab user={user} clients={ac} compNotas={compNotas} setCompNotas={setCompNotas}/>}
+            {activeTab==="impostos"   &&<ImpostosTab user={user} clients={ac} compImp={compImp} setCompImp={setCompImp}/>}
+            {activeTab==="resumo"     &&<ResumoTab user={user} clients={ac} compResumo={compResumo} setCompResumo={setCompResumo}/>}
+            {activeTab==="relatorios" &&<RelatoriosTab user={user} clients={ac} anosRel={anosRel} setAnosRel={setAnosRel}/>}
+            {activeTab==="chat"       &&<ChatTab user={user} clients={ac}/>}
+            {activeTab==="push"       &&user.role==="contador"&&<PushTab clients={ac}/>}
+          </>);
+        })()}
       </div>
     </div>
     </FileViewerProvider>
