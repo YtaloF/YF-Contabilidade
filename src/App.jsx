@@ -202,9 +202,11 @@ function CompetenciasPanel({clientId,modulo,label}){
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 function LoginScreen({onLogin,contadorPw}){
-  const[role,setRole]=useState("contador");
-  const[email,setEmail]=useState("");
-  const[pw,setPw]=useState("");
+  const saved = (() => { try{ return JSON.parse(localStorage.getItem("yfcont_savedCreds")||"null"); }catch(e){return null;} })();
+  const[role,setRole]=useState(saved?.role||"contador");
+  const[email,setEmail]=useState(saved?.email||"");
+  const[pw,setPw]=useState(saved?.pw||"");
+  const[saveLogin,setSaveLogin]=useState(!!saved);
   const[err,setErr]=useState("");
   const[loading,setLoading]=useState(false);
 
@@ -213,10 +215,14 @@ function LoginScreen({onLogin,contadorPw}){
     try{
       if(role==="contador"){
         if(email==="y.facundo@yahoo.com.br"&&pw===contadorPw){
+          if(saveLogin) localStorage.setItem("yfcont_savedCreds", JSON.stringify({role,email,pw}));
+          else localStorage.removeItem("yfcont_savedCreds");
           onLogin({role:"contador",name:"YF Contabilidade"});
         } else { setErr("Credenciais inválidas."); }
       } else {
         const c = await loginCliente(email,pw);
+        if(saveLogin) localStorage.setItem("yfcont_savedCreds", JSON.stringify({role,email,pw}));
+        else localStorage.removeItem("yfcont_savedCreds");
         onLogin({role:"cliente",...c});
       }
     }catch(e){ setErr(e.message||"Credenciais inválidas."); }
@@ -248,6 +254,13 @@ function LoginScreen({onLogin,contadorPw}){
                 style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1px solid ${C.border}`,background:C.bgAlt,color:C.text,fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit"}}/>
             </div>
             {err&&<p style={{color:C.red,fontSize:13,margin:0,background:"#FDE8E8",padding:"8px 12px",borderRadius:8}}>{err}</p>}
+            <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"4px 0"}}>
+              <div onClick={()=>setSaveLogin(!saveLogin)}
+                style={{width:20,height:20,borderRadius:5,border:`2px solid ${saveLogin?C.gold:C.border}`,background:saveLogin?C.gold:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>
+                {saveLogin&&<span style={{color:"#fff",fontSize:12,fontWeight:900,lineHeight:1}}>✓</span>}
+              </div>
+              <span style={{fontSize:13,color:C.textSub}}>Lembrar meu acesso</span>
+            </label>
             <BtnPri onClick={go} full disabled={loading}>{loading?"Entrando...":"Entrar"}</BtnPri>
           </div>
         </Card>
