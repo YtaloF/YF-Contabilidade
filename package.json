@@ -1,5 +1,4 @@
 {
-<<<<<<< HEAD
   "name": "yfcontabilidade",
   "private": true,
   "version": "0.0.0",
@@ -27,26 +26,3 @@
     "vite": "^8.0.12"
   }
 }
-=======
-  "name": "yf-contabilidade",
-  "version": "1.0.0",
-  "private": true,
-  "engines": {
-    "node": "18.x"
-  },
-  "dependencies": {
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "react-scripts": "5.0.1"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test"
-  },
-  "browserslist": {
-    "production": [">0.2%", "not dead", "not op_mini all"],
-    "development": ["last 1 chrome version"]
-  }
-} 
->>>>>>> 3cb404d1e2a6af3b84bc432cd2f253961f90bebd
