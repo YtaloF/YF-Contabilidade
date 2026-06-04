@@ -1162,6 +1162,23 @@ export default function App(){
   const[contadorPw,setContadorPw]=useState(()=>localStorage.getItem("yfcont_contadorPw")||"Yf@953701");
   const{ needsUpdate, applyUpdate, enablePush, sendLocalNotification } = usePWA();
 
+  // Auto-login ao recarregar pagina se tiver credenciais salvas
+  useEffect(()=>{
+    const saved = (() => { try{ return JSON.parse(localStorage.getItem("yfcont_savedCreds")||"null"); }catch(e){return null;} })();
+    if(!saved) return;
+    (async()=>{
+      try{
+        if(saved.role==="contador"){
+          const pw = localStorage.getItem("yfcont_contadorPw")||"Yf@953701";
+          if(saved.pw===pw) { setUser({role:"contador",name:"YF Contabilidade"}); setActiveTab("clientes"); }
+        } else {
+          const c = await loginCliente(saved.email, saved.pw);
+          if(c) { setUser({role:"cliente",...c}); setActiveTab("cadastro"); }
+        }
+      }catch(e){ localStorage.removeItem("yfcont_savedCreds"); }
+    })();
+  },[]);
+
   useEffect(()=>{ if(user) fetchClients().then(setClients); },[user]);
 
   async function handleLogin(u){
