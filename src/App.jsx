@@ -279,6 +279,22 @@ function ClientesTab({clients,setClients}){
     setClients(p=>p.map(x=>x.id===c.id?updated:x));
   }
 
+  async function deleteClient(c){
+    const conf = window.confirm(
+      "⚠️ EXCLUIR DEFINITIVAMENTE\n\n" +
+      "Empresa: " + c.name + "\n" +
+      "CNPJ: " + (c.cnpj||"—") + "\n\n" +
+      "Esta ação NÃO pode ser desfeita.\n" +
+      "Todos os dados desta empresa serão removidos.\n\n" +
+      "Tem certeza?"
+    );
+    if(!conf) return;
+    try{
+      await supabase.from("clients").delete().eq("id",c.id);
+      setClients(p=>p.filter(x=>x.id!==c.id));
+    }catch(e){ alert("Erro ao excluir: "+e.message); }
+  }
+
   return (
     <div>
       <PgH title="Clientes" action={<BtnOut onClick={()=>setShow(!show)}>+ Novo</BtnOut>}/>
@@ -308,6 +324,10 @@ function ClientesTab({clients,setClients}){
                 <button onClick={()=>toggleStatus(c)}
                   style={{padding:"5px 12px",borderRadius:8,border:`1px solid ${c.status==="ativo"?C.red+"55":C.green+"55"}`,background:c.status==="ativo"?"#FDE8E8":"#E8F5ED",color:c.status==="ativo"?C.red:C.green,fontSize:11,fontWeight:600,cursor:"pointer"}}>
                   {c.status==="ativo"?"🔴 Inativar":"🟢 Ativar"}
+                </button>
+                <button onClick={()=>deleteClient(c)}
+                  style={{padding:"5px 12px",borderRadius:8,border:`1px solid ${C.red}`,background:"#FDE8E8",color:C.red,fontSize:11,fontWeight:600,cursor:"pointer"}}>
+                  🗑 Excluir
                 </button>
               </div>
             </div>
@@ -483,12 +503,17 @@ function ExtratosTab({user,clients}){
   },[sel,mes]);
 
   async function handleFile(bid,tipo,file){
-    const path = await uploadArquivo(sel,"extratos",file);
-    const cur = envios[bid]||{pdf_path:null,ofx_path:null};
-    const pdf = tipo==="pdf"?path:cur.pdf_path;
-    const ofx = tipo==="ofx"?path:cur.ofx_path;
-    await upsertEnvio(sel,bid,mes,pdf,ofx);
-    setEnvios(p=>({...p,[bid]:{...cur,[tipo+"_path"]:path,status:"enviado",[tipo+"_name"]:file.name}}));
+    try{
+      const path = await uploadArquivo(sel,"extratos",file);
+      const cur = envios[bid]||{pdf_path:null,ofx_path:null};
+      const pdf = tipo==="pdf"?path:cur.pdf_path;
+      const ofx = tipo==="ofx"?path:cur.ofx_path;
+      await upsertEnvio(sel,bid,mes,pdf,ofx);
+      setEnvios(p=>({...p,[bid]:{...cur,[tipo+"_path"]:path,status:"enviado",[tipo+"_name"]:file.name}}));
+    }catch(e){
+      console.error("Erro ao anexar extrato:",e);
+      alert("Erro ao anexar arquivo: "+e.message);
+    }
   }
 
   const mesOpts=comps.map(id=>({id,label:mesIdLabel(id)}));
@@ -553,7 +578,13 @@ function NotasFiscaisTab({user,clients}){
   const[mes,setMes]=useState(MES_DEF);
   const[notas,setNotas]=useState([]);
   const[loading,setLoading]=useState(false);
+  const[comps,setComps]=useState([]);
   const notaRef=useRef();
+
+  useEffect(()=>{
+    if(!sel) return;
+    fetchCompetencias(sel,"notas").then(c=>{setComps(c);if(c[0])setMes(c[0]);});
+  },[sel]);
 
   useEffect(()=>{
     if(!sel||!mes) return;
@@ -566,9 +597,14 @@ function NotasFiscaisTab({user,clients}){
   async function addNota(files){
     if(!files||files.length===0) return;
     for(const file of Array.from(files)){
-      const path = await uploadArquivo(sel,"notas",file);
-      const nova = await insertNota(sel,mes,{nome:file.name,arquivo_path:path,data_emissao:TODAY,numero:""});
-      setNotas(p=>[...p,nova]);
+      try{
+        const path = await uploadArquivo(sel,"notas",file);
+        const nova = await insertNota(sel,mes,{nome:file.name,arquivo_path:path,data_emissao:TODAY,numero:""});
+        setNotas(p=>[...p,nova]);
+      }catch(e){
+        console.error("Erro ao anexar nota:",e);
+        alert("Erro ao anexar arquivo: "+e.message);
+      }
     }
   }
   async function removeNota(id){ await deleteNota(id); setNotas(p=>p.filter(n=>n.id!==id)); }
@@ -578,7 +614,10 @@ function NotasFiscaisTab({user,clients}){
       <PgH title="Notas Fiscais" action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
         {user.role==="contador"&&<div style={{width:130}}><CliSel clients={clients} value={sel} onChange={setSel}/></div>}
       </div>}/>
-      <MesFilt value={mes} onChange={setMes}/>
+      {user.role==="contador"&&<CompetenciasPanel clientId={sel} modulo="notas" label="Competências — Notas Fiscais"/>}
+      {comps.length>0
+        ?<MesFilt value={mes} onChange={setMes} options={comps.map(id=>({id,label:mesIdLabel(id)}))}/>
+        :<MesFilt value={mes} onChange={setMes}/>}
       {user.role==="contador"&&(<div style={{marginBottom:16}}>
         <input ref={notaRef} type="file" multiple accept=".pdf,.xml" style={{display:"none"}} onChange={e=>addNota(e.target.files)}/>
         <button onClick={()=>notaRef.current.click()} style={{width:"100%",padding:"14px",borderRadius:10,border:`2px dashed ${C.border}`,background:"transparent",cursor:"pointer",color:C.muted,fontSize:13}}>
@@ -996,7 +1035,7 @@ function ChatTab({user,clients}){
 }
 
 // ─── PUSH ─────────────────────────────────────────────────────────────────────
-function PushTab({clients,user}){
+function PushTab({clients,user,sendLocalNotification}){
   const[notifs,setNotifs]=useState([]);
   const[show,setShow]=useState(false);
   const[form,setForm]=useState({dest:"todos",clientId:clients[0]?.id||"",type:"geral",msg:""});
@@ -1016,6 +1055,8 @@ function PushTab({clients,user}){
     const nm=form.dest==="todos"?"Todos os clientes":clients.find(c=>c.id===form.clientId)?.name||"Cliente";
     const nova=await insertNotificacao({client_ids:ids,client_name:nm,type:form.type,msg:form.msg.trim(),date:TODAY,read:false});
     setNotifs(p=>[nova,...p]);
+    // Enviar notificação local (aparece no celular se app estiver aberto)
+    sendLocalNotification("YF Contabilidade — "+nm, form.msg.trim());
     setForm({dest:"todos",clientId:clients[0]?.id||"",type:"geral",msg:""});setShow(false);
   }
   async function markRead(id){ await markNotifRead(id); setNotifs(p=>p.map(x=>x.id===id?{...x,read:true}:x)); }
@@ -1087,13 +1128,17 @@ export default function App(){
   const[loading,setLoading]=useState(false);
   const[showChangePw,setShowChangePw]=useState(false);
   const[contadorPw,setContadorPw]=useState(()=>localStorage.getItem("yfcont_contadorPw")||"Yf@953701");
-  const{ needsUpdate, applyUpdate } = usePWA();
+  const{ needsUpdate, applyUpdate, enablePush, sendLocalNotification } = usePWA();
 
   useEffect(()=>{ if(user) fetchClients().then(setClients); },[user]);
 
   async function handleLogin(u){
     setUser(u);
     setActiveTab(u.role==="contador"?"clientes":"cadastro");
+    // Pedir permissão de notificação push ao fazer login
+    if("Notification" in window && Notification.permission === "default"){
+      setTimeout(()=>enablePush(), 2000);
+    }
   }
 
   if(!user) return <LoginScreen onLogin={handleLogin} contadorPw={contadorPw}/>;
@@ -1148,7 +1193,7 @@ export default function App(){
           {activeTab==="resumo"     &&<ResumoTab user={user} clients={ac}/>}
           {activeTab==="relatorios" &&<RelatoriosTab user={user} clients={ac}/>}
           {activeTab==="chat"       &&<ChatTab user={user} clients={ac}/>}
-          {activeTab==="push"       &&user.role==="contador"&&<PushTab clients={ac} user={user}/>}
+          {activeTab==="push"       &&user.role==="contador"&&<PushTab clients={ac} user={user} sendLocalNotification={sendLocalNotification}/>}
         </div>
       </div>
     </FileViewerProvider>
