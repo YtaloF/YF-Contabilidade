@@ -74,8 +74,29 @@ export async function upsertClient(client) {
 }
 
 export async function insertClient(client) {
-  const { id, ...rest } = client; // deixa o Supabase gerar o UUID
-  return upsertClient(rest);
+  // Remove id, created_at e qualquer campo undefined para deixar o Supabase gerar
+  const { id, created_at, ...rest } = client;
+  // Remove campos undefined
+  Object.keys(rest).forEach(k => rest[k] === undefined && delete rest[k]);
+  const row = {
+    name:           rest.name,
+    cnpj:           rest.cnpj           || null,
+    email:          rest.email,
+    password:       rest.password       || "",
+    regime:         rest.regime         || "Simples Nacional",
+    status:         rest.status         || "ativo",
+    insc_municipal: rest.insc_municipal || rest.inscMunicipal || null,
+    honorarios:     rest.honorarios     || null,
+    cert_digital:   rest.cert_digital   || null,
+    cert_validade:  rest.cert_validade  || null,
+    cert_senha:     rest.cert_senha     || null,
+    contrato:       rest.contrato       || null,
+    contrato_social:rest.contrato_social|| null,
+    nfse_cfg:       rest.nfse_cfg       || {},
+  };
+  const { data, error } = await supabase.from("clients").insert(row).select().single();
+  if (error) throw error;
+  return data;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
