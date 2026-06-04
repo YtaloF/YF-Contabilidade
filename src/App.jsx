@@ -18,6 +18,7 @@ import { supabase, loginCliente, fetchClients, upsertClient, insertClient,
 } from "./supabase";
 import usePWA from "./usePWA";
 import UpdateBanner from "./UpdateBanner";
+import { registerPush, sendPushToClients } from "./usePush";
 
 // ─── LOGO ────────────────────────────────────────────────────────────────────
 const LOGO = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCAFAAUADASIAAhEBAxEB/8QAHQABAAIDAQEBAQAAAAAAAAAAAAUGBAcIAQMCCf/EAEUQAAEDAwIEAgUJBgQEBwAAAAABAgMEBREGBxIhMUETUQgiYXGBFBUjMkJSYpHRFiQzcqGxRYOT4Rg0grNDREZjo7Tw/8QAGwEBAAIDAQEAAAAAAAAAAAAAAAECAwQFBgf/xAAyEQEAAgEDAgMGBgICAwAAAAAAAQIDBBExEiEFQWETIlFxgZEUQrHR4fAyoQaSI4Lx/9oADAMBAAIRAxEAPwDlQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHqG7dNejBX6ssVHe7Tq2zT0dZHxsd4UuU7K1yY5ORcoqeaGkTcPo87uroS9/Ml3qOGw3KROJzl5Uky8kl9jV5I72YX7Jqa2c0Yptg5j/AGvj6eraydm9EDUjIZHRais0siNVWM4JW8bsckyqYTPmaJuFBVWqunoK2CSnqqeR0UsUiYcx6LhUVPNFP6Oq/Pkc/wDpMbTJeKR+trLBmtpWJ85RMTnNEicpUT7zU5O824X7K54vh3jNsmX2efz4n1bObTRFeqrWO3ewdTuTp9LvatT2qNWPWKemljk8SB/VEdhMYVOaKnJfgpZ19EO/p/6ms/8ApS/oa22o3Irds9UxXKLjloZsQ11Mi/xos9U/E3q1fPl0VTt63XejvNvprjb6hlTSVUaSwys6PavRf9uy5QnxXW6vSZN6z7s8dv8ARp8WPJHflwVrbRtz0HqOqsV1YiTwKitkZngmjX6r2qvVqp+XNF5opAnaO922kO4+nOKkYxt7oEc+jfyTxU6uhVfJ3byd7FU4xmhkp5nwzRvjkjcrXsemHNVFwqKnZTp+Ga+urxdX5o5/vqw58M47beTZG3uys24tkdcrdqO2wyQyLFPTSxyeJCv2c4TCoqc0VPJU7KWN/ot3pi4/aG1uXsiRS8/6GvNtte1m3upYbpBxy0r/AKKrpkXCTxKvNP5k6ovZU8sm8t5t36K26Wp6XTlayesvUHiMnjXnBTu5K78L15tROqYcvZDR1t/EKamuPDPu247cfHdnw1wTjm1+Yc5X+1Nsd6rLaytp65KWV0XyiDPhyY5KqZ7Eee9TKtNrq71cqe3UELp6qpkSONje6r/ZO6r2Q7u/TX3p4afM9kro7RldrGtlgpntghgZxyzvRVazP1U5dVVe3sVexa37J1jP8YpV/wAl5uHS2iqbSFhhtkCI+RE455kT+NKqc3e7sieSe8jtZ3ul0lZprjU4c/6kEKrjxZF6N93dV8k9x4zP47qcup9npeJ7R259f75Ozj0OKmPqy8tBas0umlqqKkfcIaqd7eNzI2Knht7Zz58+Xl7yBMm4V9RdK2etq5Vlnner3uXuq/8A7oYx7HDW9aRGSd583HvNZtM1jaAAGRUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB1T6N27q323M0beajNxoo/3GV686iBqfw1Xu5idPNv8pu97kc1UVEVF5KiplFP54W25VdnuFPcKCofT1VNI2WKVi4cxyLlFQ7W2u3Ipdx9MR3FnBFXwYirqdv/AIcmPrIn3XdU+Kdjx3jvh/srfiMce7PPpP8AP6uno8vV7luXOu/O1f7CX350tcOLFcXqsTWpypZeqxL7O7fZlPsqTPo77srp6uTSV4qMWytkzSSvXlTTr9n2Mf8A0dhe6nRGp7Fb9V2Srs10i8WkqmcLsfWYvVHN8nIuFRTijW+j6/QuoqmzV6cTo14opkTDZ4l+q9vsXy7Kip2N3w/U08R086bP/lH93+cebHnxTgvGSnDuaeZcKi+7CnO/pC7aI90msrTDzXHzlExPgkyJ+SO+C91LPshuiurrN8y3SfivFBGiI9686qFOSO9rm8kd5phfM2HWuifDIydI3ROa5JGyY4Vbjmjs8sYzn2HAx3zeG6rafLn1hvzWmoxdv/jhg9JXVbLRHqO4tsL5H2tJ3JTLJ1Vn6dcZ54xnmRJ9BrbqiJcKY2nZ6dKbE7YrYbSmpbpCqXGvj/d43JzggXv7HP8A6Nx5qUDYXa1dbXxbvc4OKy216K9rk5VM3VsftROSu9mE+0dVyxYzlDy//IPEemPwuOe/n+37ujoMG8+0t9Faufg0VPNU1MjIYIWLJJI9cNY1Eyqr7EQ5P3H1tLrW/PqGcbLfT5jpIndmd3Kn3ndV+CdjY/pDbkNnqn6OtU2YoXItxlYv15E5pF7mrzd+LCfZNGGbwHwz2VPxGSPenj0j+f0RrtT1z7OvEAAPSOcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWrbfXtbt7qWG603FLTu+iq6ZFwk8SrzT3p1Reyp7yqgpkx1yVml43iU1tNZ3h3nbr1R3u2U1yt87aikqo0likb9pq/2VOaKnZUVCk7t7fw7g2BYoUYy7UmZKOVeXEveJV+67+i4XzNO7GbnLpuu/Zy6T4tlbJmCR68qaZf7NdyRfJcL5nQz6pMrn4op8/1eDL4bqYmk8d4n4x/e0u7ivXUY9p+rjC2XG5aUvkVZTOkpK+hmXk5MKxyLhWuT80VPehtHcjeuLUWlaW3Wbjp56+LNxTmngp0WFq90VUzn7uE7qh+/SG05bKeppNQU80cNdWPWKen7z8KfxU9qcmu88t75NMnr8NMGvrj1Vq94/v178OVeb4JtiieQntEaPuOutSUditrfpZ3ZfIqZbDGnN0jvYifnyTuQcbHSvaxjVc5y4RqJlVXyOztjNrGbeaaSorokS+3FrX1ar1gZ1bCnu6u83fyoX8T18aTF1fmnj++imDFOS23kuOmdL27SVho7Ja4/DpaRnA3P1nr1c934nLlV95R979yotu9OeFRyNW93BrmUjeqwt6OmX3dG+bvcpfdU6jt2j7BWXy6y+HSUjOJ2PrPd0axvm5y4RP0RThfW+sbhrvUlXfLk7Ek7sMiRcthjT6sbfYifmuV6qeY8I0E6vNObL3rE9/Wf7y39Rn9nXoryhJZHzSOkke573KrnOcuVVV6qqn4APcOUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA9N87bbs0tRpyam1BVpHU2uHi8V6+tUQpyTH3npybjvlF8zQoNPXaHHq8fRk+7Ngz2xW6qp7WmrazWd9mudVlrV9SCHOUhjTo1P7qvdVVSBBctrNvqjcTU8VAnHFQQ4lrahqfw4s9E/E7on59EUzTOPT4t+K1hT3slvjMtm+jRtUlxq262vECLS0z1S3RPTlLKi85ceTF5J5u/lOnk6Z5IndVUjbVSUttoqehooGU9LTxtihiYnqxsRMIiGnPSR3Y+YLY7Rtnnxca2PNdIxedPA77Hsc9Ovk3+Y8Pe+XxTVbRx+kf3/bqdNdPj7tY+kBuv8At3f/AJptc/FYba9Uic1eVVL0dL7U7N9mV+0alPTw9xp8FMGOMdOIcq9ptPVIADMqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD1Do2n9GXTstJDM6+3ZHSRseqJHHhFVqL5e05yQ7Epd1NDNoqZjtU2xHNhY1UV7soqNRFT6pwvG8+qxRT8Nv577Rv8PRu6OmO0z7RQaj0btPQoqpersv8A0R/oRlRsLYYc4utzXHsj/Q2RV7naKlReHU9sX/MX9CDq9wNJyKqt1DbV/wAxf0PO21/ivl1f9f4dGMGl9Pv/ACos2y1ij/xG5L/p/ofiPZmxvXHzjcv/AI/0LRUa1009eV+t6/5v+x8odZ6cavO+2/8A1P8AYmNb4rt+b/r/AAn2Gl9Pv/KPotg9P1XW7XRvubH+ht7brRtr0JZvm228cniSLLNPLjxJnds45YROSJ7/ADUpFDuBpeFUV2obcnvl/wBiw0m6ui6eNXS6mtyI1MqiPVV+CInMw5c3iOop7PLFpj5fwmtNPjnqrt91h3I3Do9udLzXSZGS1kmYqKncv8aXHf8AC3q74J1VDiu63SsvVyqblcKh9TV1UjpZZXrze5Vyqlj3N3Aq9w9SSXGTjiookWKjp1X+FFnv+Jeqr5+xEKieu8I8OjSYve/ynn9nI1Of2tu3AADrNYAAAAAAAAAAAAAAAAAAAAAAAAAAAAsu3+k6XW+o6exTXiK1T1XqU8k0SvZJJ2YqoqYVeiea8u5W9opWbW4hMRv2VoFm3D0TUbfapqLBUzrUvgax6TpEsbZWuaiorUVVVU54z5opm3jQFNZb1ZbLUXlfl1xjgfPClKvFQrLjhbInF9bDkVUToi/ApGekxExPPePknplTAbF1vtba9AXZtqvOq2/KnwpOiQ29728Kq5E58Sd2qUi92+G13OekpqxtbCxU8Ooa3hSRqoiouF6dehGHUUyxFqTvE+klqTXtLBBZdEaAvGvK6SntrYooIG8dRV1DuGKBvmq+fJeSeS9kVTIqdPaNpq5aNNZ1E3CvCtTHanLT59i+Jxq32o34CdRji0033mPhEz+iYpO26pHuV8ySv9jfYrxLbUqaet4UY6OemVXRzNe1HNc3KIvNHISUe3epHthWWihpXzpmGKrq4aeST+Vj3o5fyJnNjiItNojdHRbiIVvK+ajK+amfebDdNPVq0V2oKiiqETPBMzhVU807KntQ+NytlZaK2Wir6aSmqYlw+ORMKnLKfBU5ovdC9b1ttMTyiYmOWNlfMZUmaTR18rrJLfKeiR9thyklR40aNYqYyi5dlF5pyx3TzMul251NWsp3U9vZItTE2aJiVUKPexzeJFRqv4unPoUnPijfe0dvVPRafJW8r5jK+ZY67bzUtup6uoqbexjKNniVCJUxOdE3KJlWo9XJzVO3chobXW1FBU3CKmkfSUr2RzSonqxufnhRffwr+RauWlo3rMSiazHMMQH3oqKe4VUdLTNa+aVyNY1XI3iVeiZVUTJNrt9qdJHxJapHzMZxrCyRjpEb58COzj4EXzY6Tte0R9U1pa3eIV0EnZdNXXUNxW22ykWesRHL4Cvax3q9eTlTKp3QyW6Lvr9Rfs42iRbtnh+S+NHxcWM8OeLHF7M5E5aRMxNo3iN/p8fkjpnnZBgkr/p256YuDrdd6b5LVsRHOhWRrnNRUymeFVxyVF5khp/b/UuqbdU3Gz21aukpM+PI2aNqRYRXZdxORUTCKufYonLSK9c2jb4+R0zvtsroLDpvQOpNXsqn2K2rXJSKiT+HNGnh5zhVy5OS4Xn05H3m2y1bFRy1kdnkq4Iecj6KWOp8NPN3hOcqfErOoxRPTNo3+aemedlXB7gyqm011HQ0dfUU0kdLWo9aeVyerLwO4XY9y8jLMxHKrEBIWWw3HUNZ8jtlOlRUcKuSPxGtVUTrjiVM/Aml2w1b4r4WWlZZ488UENRFJKn/AENcrv6GO2fHSem1oifmtFLTG8QqoMl1uqo675DNC6CpR/hujn+jVrvJ3FjHxLFcdrtW2hG/ONrZScSZak1VCxXJ5oiv5k2zY6zEWtEb+pFbTxCqAybhbqm11TqWrj8OZqIqt4kdyVMpzRVToqGMXiYmN4RMbdpAASgAAAAAAAAPpTzy008c8Mjo5Y3I9j2LhWuRcoqL2VFPmAOor1c7HrfbSw7q3+g8avsKOSWBG+pWTI7gax3/ALayqx/sRXp3Of7Rday+a9obncJ3T1dXc4pppHdXPdKiqpdqXc3Tseysu38jLmldK9ZlqmwMWFrvFbJw44+JU9XGcd+hrnTlZTW6/UFbVulbBTVEcz/DYjnKjXI7CIqomVxjqcvR6ecdckTHnMR8uY2+rPkvFpiW7vSFtNjue5tC2631bar6SKNW/JXSYZ4snrcSLhOq+7BoWrjbFVTRs+qx7mpzzyRfMvm9GvLPuPqOC92qOup+CmbTugqo2oqYc93EjmuXP1sYx2NemTwzDfFp6VvvvER2+CM9oteZhvfRKpR+j3qCWhT94lSp8ZWrz6sav5MX+polepddvNyZdFsrLdWUTblZq9FbU0rncK828KuavtauFRevLphFMKpp9DLVrUU9yv6UirlKV1HF4qJ93xPE4fjw/ArpqWwZcvXEzFp3iefLj6LZJi9a7TxGyZ2it3yrVKVFax7nQUnjU6yc8esjEcmfLK48lK3ri4T3HV12mqHKrm1UkbUX7LWuVrW/BEQz3a/mp9SUl1tlBDR01HTto4qTiVyOgTPqvd1c5VVVV3LnjyMi+V+jdTXN12fU3e1SzKj6mnZSsnRz+6sdxtxn2p15+wrSmSuqnPevaaxHx278dvj6LTas4uis94n7r3qBqai9Hu33S4/S1tDwpDM762EmWLGevNuM+fCi9ia3Rg0veK202K/Ky21dTQMfRXjHKJ+ceHKneNfPsq9jWWstxoL9Zrfpaz0kttsFFwJiVUfNMqZw5+MJ3cuE7qq56Y/e7OuLPriotVRa21sa0dN8meypia3iwueJFRy/kaGLQZvaUmd6x1Xnt+Xfbb0+nDLbNXpnbv2iPntytqaauOk9mtU2q6weFUxVfEiouWyNV0GHtXu1eylG2sqpJtw7XLM5XvRsjUVfJIXIifkiIeUe5Vw/Yq4aUuPHV000TWUsrnevT4e13DlerMNXl27cuRF6HvVFp3UdPda7x1ip0f6kLEc5yuarcc1RE65NqmlzVwaiuSN7W322896xCk5KTkxzHEbfqzNxp5Idf39YnqzjqZGux3avVDbe3dstKWis2yuMHBWXK3JXVc6tX1ah+HNj98bPCd70ehquW/acuG4b7/cW10lrfUpVOp2wNWSRUVF8NU48YynNc9Bb9yr9S6uivE98uMkLazx5GcblY9ivy5vhq7GFRVThzyLZ9PkzYK4q9piIn/2jj7fspW9a3m0/H/SKo7XU2XWlNbK2Pw6iluDIZG+TmyIi/A2nWpSx7v0L6irSB6UKMhjwv073eIiNz0Trnn1VEQq2utY6V1NrSg1JbmXKlVr43VcctOzMnhryc3D+aq1EaucdEU/d01rpO6avo9STfPP7m1nBStp40RzmKqtVX+JyTK9MdjX1OPLnmt7VmN6WifnO3ZmxWrSJiJ/NE/RM6RirW78ukuFElHLOlRKkaPR6K1YXYcjk65TnnzyfGnRP+JRqY/xsjbXuhQv3Ii1XdKaohpaanfTw09O1JHq1WuamVVWpnLlVV+CGPDraxx7uprJy1/zelZ8tSJIG+Mq/cxx4+OfgRXT5uq02pt/4ojtxv37ItkptERP5t/o+O+qY3Vvqfih/7LDYHo+oi7b7hZRP+VX/AOtOUzVmoNAaw1tVajr6vUkdNVPjdJRw0MPHhrGtVEkWblnh68PLJJbebp6c0pYdW2+sprg19+WRsLaWBjmUzFjkY3OXpnHidE+715k58WS+gpgrWeqIpv8ASY3+2zHW0Rmm2/bunfReRFg1nlP/ACMX9pTWW1t6rbHuDYp6GV7HS1kVPI1iqniRvcjXNXHVML+aIpZ9m9yNP7dw35t0bcZ3XOJsDEpYGrwI1H+svE9PvdPYRukr/oXRN0jvcbL5fq+lXjpYZoIqSFkmOTnKj5FXHVMIhltivGXUTNJmLRER69tvl90RaOmnfj907vPoplVu/TWmywsZPeWQyOa1MNbK9zmueqJ0TDeNfipaLzRWncfaqvt1gpXMk0pUOZQoqLxzwMT6/vkaj3Kn3moa7j3IbXXPUGp7nPUs1DW0rqW3rTxJ4VG1yI1VR3EjmqkfExqplUVyuXmfXbLdir0rf5Ku/XK619A+B0boFesyq7KK1UR7kRMKnXyVU7mG+l1MYKbd744jb1mOfn27fdeMlJvPwtuj9nEzuBQIvP6Of/tOMfcepmodybzU00r4Zoq1z2SRrhzXJjCopn2bU+lrBuJLqChS4ttX0r4qb5OzxGLI1ycH18Ybxclz0ToeXi76GvWqqu/V0t/niqZlmWhjpYo8/hWTxFwnmqNz7ja2t+LnNNZ2mkRx5777Kbx7Lo377rhvjSw3LS+ldSzRsZcqlkcczmphZGuia/n7nZx5I7BIekTbqe5XSyLJdbfQqynkaiVPiZdl6c04WOTCe1UNa673Dm19dKTx4Ut1ro/Ugp4vpPDRcZcvTidhETsiIiITG5uvdO7g1VFUNfdqRaSN8aNdTRu4+J2eviJg08OkzY7afqifd699u+2/EM1stLRfbz2+uyg3iH5Lc6mlSd07KaR0LJF+01q4RfdhDCM66zUMksTbeyVIY40arpURHvdlVVVwq+ePchgnoKTvWGjbkABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//Z";
@@ -1068,11 +1069,21 @@ function PushTab({clients,user,sendLocalNotification}){
     const nm=form.dest==="todos"?"Todos os clientes":clients.find(c=>c.id===form.clientId)?.name||"Cliente";
     const nova=await insertNotificacao({client_ids:ids,client_name:nm,type:form.type,msg:form.msg.trim(),date:TODAY,read:false});
     setNotifs(p=>[nova,...p]);
-    // Enviar notificação local (aparece no celular se app estiver aberto)
-    sendLocalNotification("YF Contabilidade — "+nm, form.msg.trim());
+    // Enviar push nativo para os clientes
+    sendPushToClients(ids, "YF Contabilidade — "+nm, form.msg.trim(), supabase);
     setForm({dest:"todos",clientId:clients[0]?.id||"",type:"geral",msg:""});setShow(false);
   }
   async function markRead(id){ await markNotifRead(id); setNotifs(p=>p.map(x=>x.id===id?{...x,read:true}:x)); }
+  async function deleteNotif(id,e){
+    e.stopPropagation();
+    await supabase.from("notificacoes").delete().eq("id",id);
+    setNotifs(p=>p.filter(x=>x.id!==id));
+  }
+  async function deleteAllRead(){
+    if(!window.confirm("Excluir todas as notificações lidas?")) return;
+    await supabase.from("notificacoes").delete().eq("read",true);
+    setNotifs(p=>p.filter(x=>!x.read));
+  }
 
   const unread=notifs.filter(n=>!n.read).length;
   const ico=t=>({documento:"📄",imposto:"🧾",chat:"💬",banco:"🏦"}[t]||"🔔");
@@ -1080,7 +1091,10 @@ function PushTab({clients,user,sendLocalNotification}){
   return (
     <div>
       <PgH title={<span>Push {unread>0&&<span style={{background:C.gold,color:"#fff",borderRadius:20,padding:"2px 8px",fontSize:11,fontWeight:700,marginLeft:6}}>{unread}</span>}</span>}
-        action={<BtnOut onClick={()=>setShow(!show)}>+ Enviar</BtnOut>}/>
+        action={<div style={{display:"flex",gap:8}}>
+          {notifs.some(n=>n.read)&&<BtnRed onClick={deleteAllRead} sm>🗑 Limpar lidas</BtnRed>}
+          <BtnOut onClick={()=>setShow(!show)}>+ Enviar</BtnOut>
+        </div>}/>
       {show&&<FCard title="Nova Notificação" onSave={sendN} onCancel={()=>setShow(false)}>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div><FieldLabel text="Destinatário"/>
@@ -1109,7 +1123,12 @@ function PushTab({clients,user,sendLocalNotification}){
                 <div style={{color:C.text,fontSize:13}}>{n.msg}</div>
                 <div style={{color:C.muted,fontSize:11,marginTop:4}}>{n.date}</div>
               </div>
-              {!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:C.gold,flexShrink:0,alignSelf:"center"}}/>}
+              <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"center",flexShrink:0}}>
+                {!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:C.gold}}/>}
+                <button onClick={e=>deleteNotif(n.id,e)}
+                  style={{background:"transparent",border:"none",cursor:"pointer",color:C.muted,fontSize:16,lineHeight:1,padding:"2px 4px",opacity:0.6}}
+                  title="Excluir">🗑</button>
+              </div>
             </div>
           </Card>
         ))}
@@ -1148,9 +1167,13 @@ export default function App(){
   async function handleLogin(u){
     setUser(u);
     setActiveTab(u.role==="contador"?"clientes":"cadastro");
-    // Pedir permissão de notificação push ao fazer login
-    if("Notification" in window && Notification.permission === "default"){
-      setTimeout(()=>enablePush(), 2000);
+    // Registrar push subscription após login
+    if(u.role === "cliente" && u.id){
+      setTimeout(()=>registerPush(u.id, supabase), 2000);
+    } else if(u.role === "contador"){
+      if("Notification" in window && Notification.permission === "default"){
+        setTimeout(()=>enablePush(), 2000);
+      }
     }
   }
 
