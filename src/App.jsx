@@ -1266,7 +1266,7 @@ export default function App(){
           {activeTab==="chat"       &&<ChatTab user={user} clients={ac}/>}
           {activeTab==="push"       &&user.role==="contador"&&<PushTab clients={ac} user={user} sendLocalNotification={sendLocalNotification}/>}
         </div>
-      </div>
+      </div></div>
     </FileViewerProvider>
   );
 }
