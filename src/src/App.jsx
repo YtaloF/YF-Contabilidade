@@ -935,7 +935,7 @@ function RelatoriosTab({user,clients}){
   async function setArq(tipo,file){ const path=await uploadArquivo(sel,"relatorios",file); await upsertRelatorio(sel,ano,tipo,{arquivo_path:path,status:"disponivel"}); fetchRelatorios(sel,ano).then(setRels); }
   async function remArq(tipo){ await upsertRelatorio(sel,ano,tipo,{arquivo_path:null,status:"nao_liberado"}); fetchRelatorios(sel,ano).then(setRels); }
 
-  const tipos=[{id:"balanco",label:"Balanço Patrimonial",icon:"📊"},{id:"dre",label:"DRE: Demonstração do Resultado",icon:"📈"},{id:"informe",label:"Informe de Rendimentos",icon:"📋"}];
+  const tipos=[{id:"balanco",label:"Balanço Patrimonial",icon:"📊"},{id:"dre",label:"DRE — Demonstração do Resultado",icon:"📈"},{id:"informe",label:"Informe de Rendimentos",icon:"📋"}];
 
   return (
     <div>
@@ -963,7 +963,7 @@ function RelatoriosTab({user,clients}){
             <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
               <div style={{fontSize:28,flexShrink:0,marginTop:2}}>{tp.icon}</div>
               <div style={{flex:1}}>
-                <div style={{fontWeight:700,fontSize:15,color:C.text,marginBottom:6}}>{tp.label} ({ano})</div>
+                <div style={{fontWeight:700,fontSize:15,color:C.text,marginBottom:6}}>{tp.label} — {ano}</div>
                 <div style={{marginBottom:8}}>{ok?<Pill label="✓ Disponível" color={C.green} bg="#E8F5ED" border="#A8D5BB"/>:<Pill label="Não liberado" color={C.muted} bg={C.surfaceAlt} border={C.border}/>}</div>
                 {rel.arquivo_path&&<div style={{marginBottom:8}}><FileChip name={tp.label+".pdf"} path={rel.arquivo_path} modulo="relatorios"/></div>}
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -1156,7 +1156,6 @@ function ChangePwModal({current,onSave,onClose}){
 export default function App(){
   const[user,setUser]=useState(null);
   const[activeTab,setActiveTab]=useState("clientes");
-  const[unreadChat,setUnreadChat]=useState(0);
   const[clients,setClients]=useState([]);
   const[loading,setLoading]=useState(false);
   const[showChangePw,setShowChangePw]=useState(false);
@@ -1182,15 +1181,6 @@ export default function App(){
 
   useEffect(()=>{ if(user) fetchClients().then(setClients); },[user]);
 
-  // Detectar novas mensagens no chat para o cliente
-  useEffect(()=>{
-    if(!user||user.role!=="cliente") return;
-    const ch=subscribeChat(user.id, ()=>{
-      setUnreadChat(p=>activeTab==="chat"?0:p+1);
-    });
-    return ()=>{ try{ch.unsubscribe();}catch(e){} };
-  },[user]);
-
   async function handleLogin(u){
     setUser(u);
     setActiveTab(u.role==="contador"?"clientes":"cadastro");
@@ -1209,7 +1199,7 @@ export default function App(){
   const ac=clients.filter(c=>c.status!=="inativo");
   const tabs=user.role==="contador"
     ?[{id:"clientes",l:"Empresas",i:"👥"},{id:"cadastro",l:"Cadastro",i:"🏢"},{id:"bancos",l:"Bancos",i:"🏦"},{id:"extratos",l:"Extratos",i:"📁"},{id:"notas",l:"Notas",i:"🧾"},{id:"impostos",l:"Impostos",i:"💰"},{id:"resumo",l:"Resumo",i:"📊"},{id:"relatorios",l:"Relatórios",i:"📋"},{id:"chat",l:"Chat",i:"💬"},{id:"push",l:"Push",i:"🔔"}]
-    :[{id:"cadastro",l:"Cadastro",i:"🏢"},{id:"extratos",l:"Extratos",i:"📁"},{id:"notas",l:"Notas",i:"🧾"},{id:"impostos",l:"Impostos",i:"💰"},{id:"resumo",l:"Resumo",i:"📊"},{id:"relatorios",l:"Relatórios",i:"📋"},{id:"chat",l:"Chat",i:"💬",badge:unreadChat}];
+    :[{id:"cadastro",l:"Cadastro",i:"🏢"},{id:"extratos",l:"Extratos",i:"📁"},{id:"notas",l:"Notas",i:"🧾"},{id:"impostos",l:"Impostos",i:"💰"},{id:"resumo",l:"Resumo",i:"📊"},{id:"relatorios",l:"Relatórios",i:"📋"},{id:"chat",l:"Chat",i:"💬"}];
 
   return (
     <FileViewerProvider>
@@ -1238,15 +1228,15 @@ export default function App(){
 
         <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,display:"flex",width:"100%"}}>
           {tabs.map(tab=>(
-            <button key={tab.id} onClick={()=>{setActiveTab(tab.id);if(tab.id==="chat")setUnreadChat(0);}}
+            <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
               style={{flex:"1 0 0",display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 2px",border:"none",background:"transparent",cursor:"pointer",borderBottom:`2.5px solid ${activeTab===tab.id?C.gold:"transparent"}`,minWidth:0}}>
               <span style={{fontSize:16,marginBottom:1,lineHeight:1}}>{tab.i}</span>
-              <span style={{fontSize:9,fontWeight:activeTab===tab.id?700:400,color:activeTab===tab.id?C.gold:C.muted,textTransform:"uppercase",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%",padding:"0 1px"}}>{tab.l}{tab.badge>0&&<span style={{background:C.gold,color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:9,fontWeight:700,marginLeft:3,display:"inline-flex",alignItems:"center",justifyContent:"center",verticalAlign:"middle"}}>{tab.badge}</span>}</span>
+              <span style={{fontSize:9,fontWeight:activeTab===tab.id?700:400,color:activeTab===tab.id?C.gold:C.muted,textTransform:"uppercase",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%",padding:"0 1px"}}>{tab.l}</span>
             </button>
           ))}
         </div>
 
-        <div style={{maxWidth:700,margin:"0 auto",padding:"20px 16px",touchAction:"manipulation"}}>
+        <div style={{maxWidth:700,margin:"0 auto",padding:"20px 16px"}}>
           {activeTab==="clientes"   &&user.role==="contador"&&<ClientesTab clients={clients} setClients={setClients}/>}
           {activeTab==="cadastro"   &&<CadastroTab user={user} clients={ac} setClients={setClients}/>}
           {activeTab==="bancos"     &&user.role==="contador"&&<BancosTab clients={ac}/>}
