@@ -379,7 +379,7 @@ function CadastroTab({user,clients,setClients}){
       <PgH title="Cadastro da Empresa"
         action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
           {user.role==="contador"&&<div style={{width:160}}><SelIn value={selId||""} onChange={e=>setSelId(e.target.value)}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</SelIn></div>}
-          {user.role==="contador"&&!editMode&&<BtnOut onClick={()=>{setForm({...client});setEditMode(true);}} sm>✏️ Editar</BtnOut>}
+          {user.role==="contador"&&!editMode&&<BtnOut onClick={()=>{setForm({...client,nfse_endpoint:client.nfse_endpoint||"",nfse_usuario:client.nfse_usuario||"",nfse_senha:client.nfse_senha||"",nfse_token:client.nfse_token||""});setEditMode(true);}} sm>✏️ Editar</BtnOut>}
         </div>}/>
       {editMode?(
         <FCard title="Editar Cadastro" onSave={saveEdit} onCancel={()=>setEditMode(false)}>
@@ -391,12 +391,6 @@ function CadastroTab({user,clients,setClients}){
               <SelIn value={form.regime||""} onChange={e=>setForm({...form,regime:e.target.value})}>
                 <option>Simples Nacional</option><option>Lucro Presumido</option><option>Lucro Real</option><option>MEI</option>
               </SelIn>
-            </div>
-            <div style={{borderTop:"1px solid #E2DDD5",paddingTop:12,marginTop:4}}>
-              <div style={{fontWeight:700,fontSize:12,color:"#2563EB",marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>⚡ Configuração NFS-e</div>
-              {[["Endpoint (URL Webservice)","nfse_endpoint"],["Usuário","nfse_usuario"],["Senha","nfse_senha"],["Token","nfse_token"]].map(([l,k])=>(
-                <div key={k} style={{marginBottom:10}}><FieldLabel text={l}/><TxtIn value={form[k]||""} onChange={e=>setForm({...form,[k]:e.target.value})} placeholder={l}/></div>
-              ))}
             </div>
             <div style={{borderTop:"1px solid #E2DDD5",paddingTop:12,marginTop:4}}>
               <div style={{fontWeight:700,fontSize:12,color:"#2563EB",marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>⚡ Configuração NFS-e</div>
