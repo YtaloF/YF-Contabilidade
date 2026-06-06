@@ -682,9 +682,7 @@ function NotasFiscaisTab({user,clients}){
         {user.role==="contador"&&<button onClick={()=>setShowNfse(true)} style={{padding:"6px 12px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#2563EB,#1D4ED8)",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>⚡ Emitir NFS-e</button>}
       </div>}/>
       {user.role==="contador"&&<CompetenciasPanel clientId={sel} modulo="notas" label="Competências — Notas Fiscais"/>}
-      {comps.length>0
-        ?<MesFilt value={mes} onChange={setMes} options={comps.map(id=>({id,label:mesIdLabel(id)}))}/>
-        :<MesFilt value={mes} onChange={setMes}/>}
+      {comps.length>0&&<MesFilt value={mes} onChange={setMes} options={comps.map(id=>({id,label:mesIdLabel(id)}))}/>}
       {user.role==="contador"&&(<div style={{marginBottom:16}}>
         <input ref={notaRef} type="file" multiple accept=".pdf,.xml" style={{display:"none"}} onChange={e=>addNota(e.target.files)}/>
         <button onClick={()=>notaRef.current.click()} style={{width:"100%",padding:"14px",borderRadius:10,border:`2px dashed ${C.border}`,background:"transparent",cursor:"pointer",color:C.muted,fontSize:13}}>
