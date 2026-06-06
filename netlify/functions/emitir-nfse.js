@@ -1,5 +1,5 @@
 // Netlify Function: emitir-nfse.js
-// Emite NFS-e via webservice ABRASF (padrão nacional)
+// NFS-e Cabo Frio — Modernização Pública — envio via DPS (REST/JSON)
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -9,118 +9,103 @@ exports.handler = async (event) => {
   try {
     const { endpoint, usuario, senha, token, prestador, tomador, servico, competencia } = JSON.parse(event.body);
 
-    if (!endpoint) {
-      return { statusCode: 400, body: JSON.stringify({ error: "Endpoint não configurado" }) };
-    }
+    if (!endpoint) return { statusCode: 400, body: JSON.stringify({ error: "Endpoint não configurado" }) };
 
-    // Monta o XML ABRASF padrão para EnviarLoteRpsEnvio
     const dataEmissao = new Date().toISOString().split("T")[0];
     const [ano, mes] = (competencia || dataEmissao.substring(0, 7)).split("-");
+    const competenciaFormatada = `${ano}-${mes}-01`;
 
-    const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
-<EnviarLoteRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
-  <LoteRps Id="lote1" versao="2.02">
-    <NumeroLote>1</NumeroLote>
-    <CpfCnpj><Cnpj>${(prestador.cnpj || "").replace(/\D/g, "")}</Cnpj></CpfCnpj>
-    <InscricaoMunicipal>${prestador.insc_municipal || ""}</InscricaoMunicipal>
-    <QuantidadeRps>1</QuantidadeRps>
-    <ListaRps>
-      <Rps>
-        <InfDeclaracaoPrestacaoServico Id="rps1">
-          <Rps>
-            <IdentificacaoRps>
-              <Numero>1</Numero>
-              <Serie>A</Serie>
-              <Tipo>1</Tipo>
-            </IdentificacaoRps>
-            <DataEmissao>${dataEmissao}</DataEmissao>
-            <Status>1</Status>
-          </Rps>
-          <Competencia>${ano}-${mes}-01</Competencia>
-          <Servico>
-            <Valores>
-              <ValorServicos>${Number(servico.valor).toFixed(2)}</ValorServicos>
-              <ValorIss>${Number(servico.iss || 0).toFixed(2)}</ValorIss>
-              <Aliquota>${Number(servico.iss || 0).toFixed(4)}</Aliquota>
-            </Valores>
-            <IssRetido>2</IssRetido>
-            <ItemListaServico>${servico.codigo || "17.19"}</ItemListaServico>
-            <Discriminacao>${servico.descricao || "Serviços contábeis"}</Discriminacao>
-            <CodigoMunicipio>3550308</CodigoMunicipio>
-          </Servico>
-          <Prestador>
-            <CpfCnpj><Cnpj>${(prestador.cnpj || "").replace(/\D/g, "")}</Cnpj></CpfCnpj>
-            <InscricaoMunicipal>${prestador.insc_municipal || ""}</InscricaoMunicipal>
-          </Prestador>
-          ${tomador.cnpj ? `<Tomador>
-            <IdentificacaoTomador>
-              <CpfCnpj>${tomador.cnpj.replace(/\D/g, "").length === 11
-                ? `<Cpf>${tomador.cnpj.replace(/\D/g, "")}</Cpf>`
-                : `<Cnpj>${tomador.cnpj.replace(/\D/g, "")}</Cnpj>`}
-              </CpfCnpj>
-            </IdentificacaoTomador>
-            <RazaoSocial>${tomador.nome || ""}</RazaoSocial>
-            ${tomador.email ? `<Contato><Email>${tomador.email}</Email></Contato>` : ""}
-          </Tomador>` : `<Tomador>
-            <RazaoSocial>${tomador.nome || "Consumidor Final"}</RazaoSocial>
-          </Tomador>`}
-          <OptanteSimplesNacional>1</OptanteSimplesNacional>
-          <IncentivoFiscal>2</IncentivoFiscal>
-        </InfDeclaracaoPrestacaoServico>
-      </Rps>
-    </ListaRps>
-  </LoteRps>
-</EnviarLoteRpsEnvio>`;
-
-    // Headers de autenticação
-    const headers = {
-      "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": "EnviarLoteRps",
+    // DPS — formato Modernização Pública (Cabo Frio)
+    const dps = {
+      infDPS: {
+        tpAmb: "1", // 1=Produção, 2=Homologação
+        dhEmi: new Date().toISOString(),
+        verAplic: "1.00",
+        serie: "A",
+        nDPS: String(Date.now()).slice(-6),
+        dCompet: competenciaFormatada,
+        prest: {
+          CNPJ: (prestador.cnpj || "").replace(/\D/g, ""),
+          IM: prestador.insc_municipal || "",
+          xNome: prestador.razao_social || "",
+        },
+        toma: tomador.cnpj
+          ? {
+              [(tomador.cnpj.replace(/\D/g, "").length === 11) ? "CPF" : "CNPJ"]:
+                tomador.cnpj.replace(/\D/g, ""),
+              xNome: tomador.nome || "",
+              email: tomador.email || undefined,
+            }
+          : { xNome: tomador.nome || "Consumidor Final" },
+        serv: {
+          cServ: {
+            cTribNac: servico.codigo || "010101",
+            xDescServ: servico.descricao || "Serviços contábeis",
+          },
+          vServPrest: {
+            vReceb: Number(servico.valor || 0).toFixed(2),
+          },
+          tribServ: {
+            tribMun: {
+              tribISSQN: "1",
+              cNatOp: "1",
+              BM: {
+                vBC: Number(servico.valor || 0).toFixed(2),
+                pAliq: Number(servico.iss || 0).toFixed(4),
+              },
+            },
+            totTrib: {
+              vTotTrib: (Number(servico.valor || 0) * Number(servico.iss || 0) / 100).toFixed(2),
+            },
+          },
+        },
+      },
     };
-    if (usuario) headers["Authorization"] = "Basic " + Buffer.from(`${usuario}:${senha}`).toString("base64");
-    if (token)   headers["Authorization"] = `Bearer ${token}`;
 
-    // Envelope SOAP
-    const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:nfse="http://www.abrasf.org.br/nfse.xsd">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <nfse:EnviarLoteRpsEnvio>
-      ${xmlBody}
-    </nfse:EnviarLoteRpsEnvio>
-  </soapenv:Body>
-</soapenv:Envelope>`;
+    const headers = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    };
+
+    // Autenticação: token Bearer ou Basic
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    } else if (usuario && senha) {
+      headers["Authorization"] = "Basic " + Buffer.from(`${usuario}:${senha}`).toString("base64");
+    }
 
     const response = await fetch(endpoint, {
       method: "POST",
       headers,
-      body: soapEnvelope,
+      body: JSON.stringify(dps),
     });
 
     const responseText = await response.text();
+    let responseData;
+    try { responseData = JSON.parse(responseText); } catch { responseData = { raw: responseText }; }
 
-    // Extrai número da NFS-e da resposta XML
-    const numeroMatch = responseText.match(/<Numero>(\d+)<\/Numero>/);
-    const erroMatch = responseText.match(/<Mensagem>([^<]+)<\/Mensagem>/);
-    const codigoErro = responseText.match(/<Codigo>([^<]+)<\/Codigo>/);
-
-    if (erroMatch && !numeroMatch) {
+    if (!response.ok) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ 
-          error: erroMatch[1],
-          codigo: codigoErro?.[1],
-          resposta: responseText.substring(0, 500)
+        body: JSON.stringify({
+          error: responseData?.xMotivo || responseData?.message || responseData?.raw || "Erro ao emitir NFS-e",
+          status: response.status,
+          detalhe: responseData,
         })
       };
     }
+
+    // Extrair número da NFS-e da resposta
+    const numero = responseData?.nNFSe || responseData?.numero || responseData?.infNFSe?.nNFSe || "—";
+    const chave  = responseData?.cLocEmi || responseData?.infNFSe?.cLocEmi || "";
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         sucesso: true,
-        numero: numeroMatch?.[1],
-        resposta: responseText.substring(0, 500)
+        numero,
+        chave,
+        resposta: responseData,
       })
     };
 
