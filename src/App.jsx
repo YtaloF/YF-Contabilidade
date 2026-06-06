@@ -1194,7 +1194,7 @@ export default function App(){
     const ch=supabase.channel("badge-chat-"+user.id)
       .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`client_id=eq.${user.id}`},(payload)=>{
         // Só incrementa se a msg foi enviada pelo contador e cliente nao esta no chat
-        if(payload.new?.sender==="contador" && activeTabRef.current!=="chat"){
+        if(payload.new?.from_role==="contador" && activeTabRef.current!=="chat"){
           setUnreadChat(p=>p+1);
         }
       }).subscribe();
