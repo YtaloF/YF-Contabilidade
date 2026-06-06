@@ -759,7 +759,7 @@ function NotasFiscaisTab({user,clients}){
           token: clienteAtual.nfse_token,
           prestador: { razao_social: clienteAtual.name, cnpj: clienteAtual.cnpj, insc_municipal: clienteAtual.insc_municipal },
           tomador: { nome: nfseForm.tomador_nome, cnpj: nfseForm.tomador_cnpj, email: nfseForm.tomador_email, logradouro: nfseForm.tomador_logradouro, numero: nfseForm.tomador_numero, bairro: nfseForm.tomador_bairro, cep: nfseForm.tomador_cep, uf: nfseForm.tomador_uf },
-          servico: { descricao: nfseForm.servico_descricao, valor: parseFloat(nfseForm.servico_valor)||0, codigo: nfseForm.servico_codigo, iss: parseFloat(nfseForm.servico_iss)||0, cnae: nfseForm.servico_cnae },
+          servico: { descricao: nfseForm.servico_descricao, valor: parseFloat((nfseForm.servico_valor||"0").replace(",","."))||0, codigo: (nfseForm.servico_codigo||"").split(/[—–]/)[0].trim(), iss: parseFloat((nfseForm.servico_iss||"0").replace(",","."))||0, cnae: nfseForm.servico_cnae },
           competencia: mes,
         })
       });

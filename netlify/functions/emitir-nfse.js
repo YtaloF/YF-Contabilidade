@@ -42,8 +42,8 @@ exports.handler = async (event) => {
       },
       servico: {
         discriminacao: servico.descricao || "Serviços prestados",
-        valor_servicos: Number(servico.valor || 0),
-        item_lista_servico: (servico.codigo || "17.18").split("—")[0].trim(),
+        valor_servicos: parseFloat(String(servico.valor || 0).replace(",", ".")) || 0,
+        item_lista_servico: (servico.codigo || "17.18").split(/[—–-]/)[0].trim(),
         codigo_cnae: (servico.cnae || "6920601").replace(/\D/g, ""),
         iss_retido: false,
         ...(servico.iss ? { aliquota: Number(servico.iss) / 100 } : {}),
