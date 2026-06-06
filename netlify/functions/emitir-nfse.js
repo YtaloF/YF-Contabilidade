@@ -57,7 +57,8 @@ exports.handler = async (event) => {
     if (usuario && senha) {
       headers["Authorization"] = "Basic " + Buffer.from(`${usuario}:${senha}`).toString("base64");
     }
-    if (token) {
+    // TEST AUTH
+    if (usuario && senha) { console.log("AUTH: Basic"); } if (token) {
       headers["token"] = token; // Header customizado comum em prefeituras
       headers["Authorization"] = `Bearer ${token}`;
     }
