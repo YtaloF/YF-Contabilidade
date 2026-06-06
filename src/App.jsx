@@ -759,7 +759,7 @@ function NotasFiscaisTab({user,clients}){
           token: clienteAtual.nfse_token,
           prestador: { razao_social: clienteAtual.name, cnpj: clienteAtual.cnpj, insc_municipal: clienteAtual.insc_municipal },
           tomador: { nome: nfseForm.tomador_nome, cnpj: nfseForm.tomador_cnpj, email: nfseForm.tomador_email, logradouro: nfseForm.tomador_logradouro, numero: nfseForm.tomador_numero, bairro: nfseForm.tomador_bairro, cep: nfseForm.tomador_cep, uf: nfseForm.tomador_uf },
-          servico: { descricao: nfseForm.servico_descricao, valor: parseFloat((nfseForm.servico_valor||"0").replace(",","."))||0, codigo: (nfseForm.servico_codigo||"").split(/[—–]/)[0].trim(), iss: parseFloat((nfseForm.servico_iss||"0").replace(",","."))||0, cnae: nfseForm.servico_cnae },
+          servico: { descricao: nfseForm.servico_descricao, valor: parseFloat((nfseForm.servico_valor||"0").replace(",","."))||0, codigo: (nfseForm.servico_codigo||"17.18").replace(/[^0-9.]/g,"").trim()||"17.18", iss: parseFloat((nfseForm.servico_iss||"0").replace(",","."))||0, cnae: nfseForm.servico_cnae },
           competencia: mes,
         })
       });
@@ -873,7 +873,7 @@ function NotasFiscaisTab({user,clients}){
                   <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:`1px solid ${C.border}`,zIndex:999,maxHeight:200,overflowY:"auto"}}>
                     {sugestoes.map(s=>(
                       <button key={s.codigo} onClick={()=>{
-                        setNfseForm({...nfseForm,servico_codigo:s.codigo,servico_descricao:s.desc,servico_iss:clienteAtual?.nfse_aliquota||""});
+                        setNfseForm({...nfseForm,servico_codigo:s.codigo,servico_descricao:nfseForm.servico_descricao||s.desc,servico_iss:nfseForm.servico_iss||clienteAtual?.nfse_aliquota||""});
                         setBuscaServico(s.codigo+" — "+s.desc);
                         setShowSugestoes(false);
                       }} style={{display:"block",width:"100%",textAlign:"left",padding:"10px 14px",border:"none",background:"transparent",cursor:"pointer",fontSize:12,borderBottom:`1px solid ${C.border}`}}>
