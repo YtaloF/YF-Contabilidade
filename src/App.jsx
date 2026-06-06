@@ -392,6 +392,18 @@ function CadastroTab({user,clients,setClients}){
                 <option>Simples Nacional</option><option>Lucro Presumido</option><option>Lucro Real</option><option>MEI</option>
               </SelIn>
             </div>
+            <div style={{borderTop:"1px solid #E2DDD5",paddingTop:12,marginTop:4}}>
+              <div style={{fontWeight:700,fontSize:12,color:"#2563EB",marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>⚡ Configuração NFS-e</div>
+              {[["Endpoint (URL Webservice)","nfse_endpoint"],["Usuário","nfse_usuario"],["Senha","nfse_senha"],["Token","nfse_token"]].map(([l,k])=>(
+                <div key={k} style={{marginBottom:10}}><FieldLabel text={l}/><TxtIn value={form[k]||""} onChange={e=>setForm({...form,[k]:e.target.value})} placeholder={l}/></div>
+              ))}
+            </div>
+            <div style={{borderTop:"1px solid #E2DDD5",paddingTop:12,marginTop:4}}>
+              <div style={{fontWeight:700,fontSize:12,color:"#2563EB",marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>⚡ Configuração NFS-e</div>
+              {[["Endpoint (URL Webservice)","nfse_endpoint"],["Usuário","nfse_usuario"],["Senha","nfse_senha"],["Token","nfse_token"]].map(([l,k])=>(
+                <div key={k} style={{marginBottom:10}}><FieldLabel text={l}/><TxtIn value={form[k]||""} onChange={e=>setForm({...form,[k]:e.target.value})} placeholder={l}/></div>
+              ))}
+            </div>
           </div>
         </FCard>
       ):(
