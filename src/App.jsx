@@ -985,7 +985,7 @@ function RelatoriosTab({user,clients}){
 }
 
 // ─── CHAT (REALTIME) ──────────────────────────────────────────────────────────
-function ChatTab({user,clients}){
+function ChatTab({user,clients,onNewMessage}){
   const[sel,setSel]=useState(user.role==="cliente"?user.id:(clients[0]?.id||""));
   const[msgs,setMsgs]=useState([]);
   const[msg,setMsg]=useState("");
@@ -995,7 +995,10 @@ function ChatTab({user,clients}){
   useEffect(()=>{
     if(!sel) return;
     fetchMessages(sel).then(setMsgs);
-    const ch=subscribeChat(sel,m=>setMsgs(p=>[...p,m]));
+    const ch=subscribeChat(sel,m=>{
+      setMsgs(p=>[...p,m]);
+      if(onNewMessage) onNewMessage();
+    });
     return ()=>supabase.removeChannel(ch);
   },[sel]);
 
@@ -1185,14 +1188,16 @@ export default function App(){
 
   useEffect(()=>{ activeTabRef.current=activeTab; },[activeTab]);
 
-  // Detectar novas mensagens no chat para o cliente
+  // Badge de chat: detectar novas mensagens quando cliente NAO esta na aba chat
   useEffect(()=>{
     if(!user||user.role!=="cliente") return;
-    const ch=subscribeChat(user.id, ()=>{
-      setUnreadChat(p=>activeTabRef.current==="chat"?0:p+1);
-    });
-    return ()=>{ try{ch.unsubscribe();}catch(e){} };
-  },[user]);
+    if(activeTab==="chat") return; // nao subscrever se ja esta no chat
+    const ch=supabase.channel("badge-chat-"+user.id)
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`client_id=eq.${user.id}`},()=>{
+        setUnreadChat(p=>p+1);
+      }).subscribe();
+    return ()=>supabase.removeChannel(ch);
+  },[user,activeTab]);
 
   async function handleLogin(u){
     setUser(u);
@@ -1216,7 +1221,7 @@ export default function App(){
 
   return (
     <FileViewerProvider>
-      <div style={{minHeight:"100vh",background:C.bg,fontFamily:"system-ui,-apple-system,sans-serif"}}>
+      <div style={{height:"100dvh",overflow:"hidden",display:"flex",flexDirection:"column",background:C.bg,fontFamily:"system-ui,-apple-system,sans-serif"}}>
         {needsUpdate&&<UpdateBanner onUpdate={applyUpdate}/>}
         {showChangePw&&<ModalBox onClose={()=>setShowChangePw(false)}><ChangePwModal current={contadorPw} onSave={pw=>{setContadorPw(pw);localStorage.setItem("yfcont_contadorPw",pw);setShowChangePw(false);}} onClose={()=>setShowChangePw(false)}/></ModalBox>}
 
@@ -1249,7 +1254,7 @@ export default function App(){
           ))}
         </div>
 
-        <div style={{maxWidth:700,margin:"0 auto",padding:"20px 16px",touchAction:"manipulation"}}>
+        <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"}}><div style={{maxWidth:700,margin:"0 auto",padding:"20px 16px",touchAction:"manipulation"}}>
           {activeTab==="clientes"   &&user.role==="contador"&&<ClientesTab clients={clients} setClients={setClients}/>}
           {activeTab==="cadastro"   &&<CadastroTab user={user} clients={ac} setClients={setClients}/>}
           {activeTab==="bancos"     &&user.role==="contador"&&<BancosTab clients={ac}/>}
