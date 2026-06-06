@@ -96,6 +96,8 @@ function FileViewerProvider({children}){
             <div style={{flex:1,overflowY:"auto",padding:24,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,background:"#F7F6F2"}}>
               {loading&&<div style={{fontSize:14,color:C.muted}}>⏳ Carregando...</div>}
               {!loading&&url&&file.type==="pdf"&&<iframe src={url} style={{width:"100%",height:400,borderRadius:8,border:"none"}}/>}
+              {!loading&&url&&["jpg","jpeg","png","gif","webp","svg"].includes(file.type)&&<img src={url} alt={file.name} style={{maxWidth:"100%",maxHeight:400,borderRadius:8,objectFit:"contain"}}/>}
+              {!loading&&url&&!["pdf","jpg","jpeg","png","gif","webp","svg"].includes(file.type)&&<div style={{textAlign:"center"}}><div style={{fontSize:64,marginBottom:16}}>📎</div><div style={{fontSize:13,color:C.muted}}>{file.name}</div><div style={{fontSize:12,color:C.muted,marginTop:8}}>Use o botão Baixar para abrir este arquivo</div></div>}
               {!loading&&!url&&<div style={{textAlign:"center"}}><div style={{fontSize:64,marginBottom:16}}>📄</div><div style={{fontSize:13,color:C.muted}}>{file.name}</div></div>}
             </div>
             <div style={{padding:"14px 18px",borderTop:"1px solid #E2DDD5",display:"flex",gap:10,justifyContent:"flex-end",flexShrink:0,background:"#fff"}}>
@@ -986,6 +988,7 @@ function RelatoriosTab({user,clients}){
 
 // ─── CHAT (REALTIME) ──────────────────────────────────────────────────────────
 function ChatTab({user,clients,onNewMessage}){
+  const{openFile}=useFileViewer();
   const[sel,setSel]=useState(user.role==="cliente"?user.id:(clients[0]?.id||""));
   const[msgs,setMsgs]=useState([]);
   const[msg,setMsg]=useState("");
@@ -1022,7 +1025,11 @@ function ChatTab({user,clients,onNewMessage}){
               {!me&&<div style={{color:C.gold,fontSize:10,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>{m.from_role==="contador"?"YF Contabilidade":(clients.find(c=>c.id===sel)?.name||"Cliente")}</div>}
               {m.text&&<p style={{color:me?"#fff":C.text,fontSize:14,margin:0,lineHeight:1.5}}>{m.text}</p>}
               {m.files&&m.files.length>0&&<div style={{marginTop:m.text?8:0,display:"flex",flexDirection:"column",gap:4}}>
-                {m.files.map((f,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.25)",borderRadius:6,padding:"4px 8px"}}><span>📎</span><span style={{color:me?"#fff":C.gold,fontSize:12,fontWeight:600}}>{f}</span></div>)}
+                {m.files.map((f,i)=>{
+                  const ext=(f.split(".").pop()||"").toLowerCase();
+                  const icon=ext==="pdf"?"📄":["jpg","jpeg","png","gif","webp"].includes(ext)?"🖼️":"📎";
+                  return(<button key={i} onClick={()=>openFile(f.split("/").pop(), f, "arquivos")} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.25)",borderRadius:6,padding:"6px 10px",border:"1px solid rgba(255,255,255,0.4)",cursor:"pointer",textAlign:"left"}}><span>{icon}</span><span style={{color:me?"#fff":C.gold,fontSize:12,fontWeight:600}}>{f}</span><span style={{fontSize:10,opacity:0.6}}>▶</span></button>);
+                })}
               </div>}
               <div style={{color:me?"rgba(255,255,255,0.7)":C.muted,fontSize:10,textAlign:"right",marginTop:4}}>
                 {new Date(m.created_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}
@@ -1035,13 +1042,13 @@ function ChatTab({user,clients,onNewMessage}){
       {pf.length>0&&<div style={{background:"#FDF5E0",borderRadius:8,padding:"8px 12px",marginBottom:8,border:"1px solid #F0D080"}}>
         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
           {pf.map((f,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:4,background:"#fff",borderRadius:6,padding:"3px 8px",border:`1px solid ${C.border}`}}>
-            <span style={{fontSize:12}}>📎</span><span style={{color:C.textSub,fontSize:12}}>{f}</span>
+            <span style={{fontSize:12}}>📎</span><span style={{color:C.textSub,fontSize:12}}>{f.name||f}</span>
             <button onClick={()=>setPf(p=>p.filter((_,j)=>j!==i))} style={{color:C.red,background:"transparent",border:"none",cursor:"pointer",fontSize:14,lineHeight:1,marginLeft:2}}>×</button>
           </div>)}
         </div>
       </div>}
       <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
-        <input ref={fileRef} type="file" multiple style={{display:"none"}} onChange={e=>setPf(p=>[...p,...Array.from(e.target.files).map(f=>f.name)])}/>
+        <input ref={fileRef} type="file" multiple style={{display:"none"}} onChange={e=>setPf(p=>[...p,...Array.from(e.target.files)])}/>
         <button onClick={()=>fileRef.current.click()} style={{width:42,height:42,borderRadius:10,border:`1px solid ${C.border}`,background:"#fff",cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>📎</button>
         <input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()} placeholder="Digite uma mensagem..."
           style={{flex:1,padding:"11px 14px",borderRadius:10,border:`1px solid ${C.border}`,background:"#fff",color:C.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>

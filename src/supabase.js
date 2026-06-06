@@ -265,8 +265,21 @@ export async function fetchMessages(clientId) {
 }
 
 export async function sendMessage(clientId, fromRole, text, files) {
+  // files pode ser array de File objects (upload) ou array de strings (paths já salvos)
+  let filePaths = [];
+  if (files && files.length > 0) {
+    for (const f of files) {
+      if (typeof f === "string") {
+        filePaths.push(f);
+      } else {
+        // É um File object — fazer upload
+        const path = await uploadArquivo(clientId, "chat", f);
+        filePaths.push(path);
+      }
+    }
+  }
   return check(await supabase.from("chat_messages").insert({
-    client_id: clientId, from_role: fromRole, text, files: files || [],
+    client_id: clientId, from_role: fromRole, text, files: filePaths,
   }).select().single());
 }
 
