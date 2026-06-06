@@ -1019,7 +1019,7 @@ function ChatTab({user,clients,onNewMessage}){
           const me=(user.role==="contador"&&m.from_role==="contador")||(user.role==="cliente"&&m.from_role==="cliente");
           return (<div key={m.id} style={{display:"flex",justifyContent:me?"flex-end":"flex-start"}}>
             <div style={{maxWidth:"78%",background:me?`linear-gradient(135deg,${C.goldLight},${C.goldDark})`:"#fff",borderRadius:me?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",boxShadow:C.shadow,border:me?"none":`1px solid ${C.border}`}}>
-              {!me&&<div style={{color:C.gold,fontSize:10,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>{m.from_role==="contador"?"YF Contabilidade":"Cliente"}</div>}
+              {!me&&<div style={{color:C.gold,fontSize:10,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>{m.from_role==="contador"?"YF Contabilidade":(clients.find(c=>c.id===sel)?.name||"Cliente")}</div>}
               {m.text&&<p style={{color:me?"#fff":C.text,fontSize:14,margin:0,lineHeight:1.5}}>{m.text}</p>}
               {m.files&&m.files.length>0&&<div style={{marginTop:m.text?8:0,display:"flex",flexDirection:"column",gap:4}}>
                 {m.files.map((f,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.25)",borderRadius:6,padding:"4px 8px"}}><span>📎</span><span style={{color:me?"#fff":C.gold,fontSize:12,fontWeight:600}}>{f}</span></div>)}
@@ -1156,6 +1156,13 @@ function ChangePwModal({current,onSave,onClose}){
   </div>);
 }
 
+// Fix iOS scroll/zoom
+const globalStyle = `
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; position: fixed; width: 100%; }
+  input, textarea, select { font-size: 16px !important; }
+`;
+
 export default function App(){
   const[user,setUser]=useState(null);
   const[activeTab,setActiveTab]=useState("clientes");
@@ -1190,11 +1197,14 @@ export default function App(){
 
   // Badge de chat: detectar novas mensagens quando cliente NAO esta na aba chat
   useEffect(()=>{
-    if(!user||user.role!=="cliente") return;
-    const ch=supabase.channel("badge-chat-"+user.id)
-      .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`client_id=eq.${user.id}`},(payload)=>{
-        // Só incrementa se a msg foi enviada pelo contador e cliente nao esta no chat
-        if(payload.new?.from_role==="contador" && activeTabRef.current!=="chat"){
+    if(!user) return;
+    const ch=supabase.channel("badge-chat-"+user.id+"-"+user.role)
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},(payload)=>{
+        if(activeTabRef.current==="chat") return;
+        if(user.role==="cliente" && payload.new?.from_role==="contador" && payload.new?.client_id===user.id){
+          setUnreadChat(p=>p+1);
+        }
+        if(user.role==="contador" && payload.new?.from_role==="cliente"){
           setUnreadChat(p=>p+1);
         }
       }).subscribe();
@@ -1218,11 +1228,12 @@ export default function App(){
 
   const ac=clients.filter(c=>c.status!=="inativo");
   const tabs=user.role==="contador"
-    ?[{id:"clientes",l:"Empresas",i:"👥"},{id:"cadastro",l:"Cadastro",i:"🏢"},{id:"bancos",l:"Bancos",i:"🏦"},{id:"extratos",l:"Extratos",i:"📁"},{id:"notas",l:"Notas",i:"🧾"},{id:"impostos",l:"Impostos",i:"💰"},{id:"resumo",l:"Resumo",i:"📊"},{id:"relatorios",l:"Relatórios",i:"📋"},{id:"chat",l:"Chat",i:"💬"},{id:"push",l:"Push",i:"🔔"}]
+    ?[{id:"clientes",l:"Empresas",i:"👥"},{id:"cadastro",l:"Cadastro",i:"🏢"},{id:"bancos",l:"Bancos",i:"🏦"},{id:"extratos",l:"Extratos",i:"📁"},{id:"notas",l:"Notas",i:"🧾"},{id:"impostos",l:"Impostos",i:"💰"},{id:"resumo",l:"Resumo",i:"📊"},{id:"relatorios",l:"Relatórios",i:"📋"},{id:"chat",l:"Chat",i:"💬",badge:unreadChat},{id:"push",l:"Push",i:"🔔"}]
     :[{id:"cadastro",l:"Cadastro",i:"🏢"},{id:"extratos",l:"Extratos",i:"📁"},{id:"notas",l:"Notas",i:"🧾"},{id:"impostos",l:"Impostos",i:"💰"},{id:"resumo",l:"Resumo",i:"📊"},{id:"relatorios",l:"Relatórios",i:"📋"},{id:"chat",l:"Chat",i:"💬",badge:unreadChat}];
 
   return (
     <FileViewerProvider>
+      <style>{globalStyle}</style>
       <div style={{height:"100dvh",overflow:"hidden",display:"flex",flexDirection:"column",background:C.bg,fontFamily:"system-ui,-apple-system,sans-serif"}}>
         {needsUpdate&&<UpdateBanner onUpdate={applyUpdate}/>}
         {showChangePw&&<ModalBox onClose={()=>setShowChangePw(false)}><ChangePwModal current={contadorPw} onSave={pw=>{setContadorPw(pw);localStorage.setItem("yfcont_contadorPw",pw);setShowChangePw(false);}} onClose={()=>setShowChangePw(false)}/></ModalBox>}
