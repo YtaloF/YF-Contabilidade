@@ -394,7 +394,7 @@ function CadastroTab({user,clients,setClients}){
             </div>
             <div style={{borderTop:"1px solid #E2DDD5",paddingTop:12,marginTop:4}}>
               <div style={{fontWeight:700,fontSize:12,color:"#2563EB",marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>⚡ Configuração NFS-e</div>
-              {[["Endpoint (URL Webservice)","nfse_endpoint"],["Usuário","nfse_usuario"],["Senha","nfse_senha"],["Token","nfse_token"]].map(([l,k])=>(
+              {[["Endpoint (URL Webservice)","nfse_endpoint"],["Usuário","nfse_usuario"],["Senha","nfse_senha"],["Token","nfse_token"],["Alíquota ISS Padrão (%)","nfse_aliquota"]].map(([l,k])=>(
                 <div key={k} style={{marginBottom:10}}><FieldLabel text={l}/><TxtIn value={form[k]||""} onChange={e=>setForm({...form,[k]:e.target.value})} placeholder={l}/></div>
               ))}
             </div>
@@ -432,7 +432,7 @@ function CadastroTab({user,clients,setClients}){
                 </div>
               ):(
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:8}}>
-                  {[["Endpoint",client.nfse_endpoint],["Usuário",client.nfse_usuario],["Senha",client.nfse_senha],["Token",client.nfse_token]].map(([l,v])=>(
+                  {[["Endpoint",client.nfse_endpoint],["Usuário",client.nfse_usuario],["Senha",client.nfse_senha],["Token",client.nfse_token],["Alíquota Padrão",client.nfse_aliquota?client.nfse_aliquota+"%":null]].map(([l,v])=>(
                     <div key={l}><div style={{fontSize:10,color:C.muted,fontWeight:600,textTransform:"uppercase",marginBottom:3}}>{l}</div><div style={{fontSize:13,color:v?C.text:C.muted,fontFamily:l!=="Endpoint"?"monospace":"inherit",wordBreak:"break-all"}}>{v||"—"}</div></div>
                   ))}
                   {!client.nfse_endpoint&&<div style={{gridColumn:"1/-1",fontSize:12,color:C.muted,fontStyle:"italic"}}>Clique em Editar para configurar o webservice NFS-e</div>}
@@ -612,6 +612,119 @@ function ExtratosTab({user,clients}){
 }
 
 // ─── NOTAS FISCAIS ────────────────────────────────────────────────────────────
+
+const SERVICOS_LC116 = [
+  {codigo:"1.01",desc:"Análise e desenvolvimento de sistemas"},
+  {codigo:"1.02",desc:"Programação"},
+  {codigo:"1.03",desc:"Processamento, armazenamento ou hospedagem de dados"},
+  {codigo:"1.04",desc:"Elaboração de programas de computadores"},
+  {codigo:"1.05",desc:"Licenciamento ou cessão de direito de uso de programas"},
+  {codigo:"1.06",desc:"Suporte técnico em informática"},
+  {codigo:"1.07",desc:"Planejamento, confecção, manutenção e atualização de páginas eletrônicas"},
+  {codigo:"4.01",desc:"Medicina e biomedicina"},
+  {codigo:"4.02",desc:"Análises clínicas, patologia, eletricidade médica"},
+  {codigo:"4.03",desc:"Hospitais, clínicas, laboratórios, sanatórios"},
+  {codigo:"4.06",desc:"Enfermagem, inclusive serviços auxiliares"},
+  {codigo:"4.08",desc:"Terapia ocupacional, fisioterapia e fonoaudiologia"},
+  {codigo:"4.09",desc:"Terapias de qualquer espécie destinadas ao tratamento físico"},
+  {codigo:"4.11",desc:"Odontologia"},
+  {codigo:"4.12",desc:"Prótese sob encomenda"},
+  {codigo:"4.13",desc:"Serviços de saúde, assistência médica"},
+  {codigo:"4.14",desc:"Serviços de saúde mental"},
+  {codigo:"4.16",desc:"Nutrição"},
+  {codigo:"4.17",desc:"Medicina veterinária e zootecnia"},
+  {codigo:"5.01",desc:"Medicina e engenharia legal e pericial"},
+  {codigo:"5.02",desc:"Contabilidade, auditoria, guarda-livros, técnicos em contabilidade"},
+  {codigo:"5.03",desc:"Agenciamento, corretagem ou intermediação de câmbio"},
+  {codigo:"5.04",desc:"Agenciamento, corretagem ou intermediação de seguros"},
+  {codigo:"5.05",desc:"Agenciamento, corretagem ou intermediação de planos"},
+  {codigo:"5.06",desc:"Agenciamento, corretagem ou intermediação de títulos"},
+  {codigo:"5.07",desc:"Agenciamento, corretagem ou intermediação de contratos"},
+  {codigo:"5.09",desc:"Arrendamento mercantil (leasing)"},
+  {codigo:"6.01",desc:"Transporte de natureza municipal"},
+  {codigo:"7.01",desc:"Engenharia, agronomia, agrimensura, arquitetura, geologia"},
+  {codigo:"7.02",desc:"Execução, por administração, empreitada ou subempreitada, de obras"},
+  {codigo:"7.03",desc:"Elaboração de planos diretores, estudos de viabilidade"},
+  {codigo:"7.04",desc:"Demolição"},
+  {codigo:"7.05",desc:"Reparação, conservação e reforma de edifícios"},
+  {codigo:"8.01",desc:"Ensino regular pré-escolar, fundamental, médio e superior"},
+  {codigo:"8.02",desc:"Instrução, treinamento, orientação pedagógica"},
+  {codigo:"9.01",desc:"Hospedagem de qualquer natureza em hotéis"},
+  {codigo:"10.01",desc:"Agenciamento, corretagem ou intermediação de bens móveis"},
+  {codigo:"10.02",desc:"Agenciamento, corretagem ou intermediação de bens imóveis"},
+  {codigo:"10.05",desc:"Agenciamento, corretagem ou intermediação de obras de arte"},
+  {codigo:"10.09",desc:"Representação de qualquer natureza, inclusive comercial"},
+  {codigo:"11.01",desc:"Guarda e estacionamento de veículos terrestres automotores"},
+  {codigo:"11.02",desc:"Vigilância, segurança ou monitoramento de bens e pessoas"},
+  {codigo:"11.03",desc:"Escolta, inclusive de veículos e cargas"},
+  {codigo:"11.04",desc:"Armazenamento, depósito, carga, descarga, arrumação e guarda de bens"},
+  {codigo:"12.01",desc:"Diversões, lazer, entretenimento e congêneres"},
+  {codigo:"12.03",desc:"Apresentações circenses"},
+  {codigo:"12.07",desc:"Fonografia ou gravação de sons, inclusive trucagem"},
+  {codigo:"12.08",desc:"Fonografia ou gravação de sons, inclusive mixagem"},
+  {codigo:"12.11",desc:"Competições esportivas ou de destreza física ou intelectual"},
+  {codigo:"12.13",desc:"Produção, mediante ou sem encomenda prévia, de eventos"},
+  {codigo:"13.01",desc:"Cessão de andaimes, palcos, coberturas e outras estruturas"},
+  {codigo:"13.02",desc:"Execução de funerais e congêneres"},
+  {codigo:"13.03",desc:"Guarda e manutenção de animais"},
+  {codigo:"14.01",desc:"Lubrificação, limpeza, lustração, revisão, carga e recarga"},
+  {codigo:"14.02",desc:"Assistência técnica"},
+  {codigo:"14.03",desc:"Recondicionamento de motores"},
+  {codigo:"14.09",desc:"Alfaiataria e costura"},
+  {codigo:"14.10",desc:"Tinturaria e lavanderia"},
+  {codigo:"14.13",desc:"Carpintaria e serralheria"},
+  {codigo:"15.01",desc:"Administração de fundos quaisquer"},
+  {codigo:"15.09",desc:"Distribuição de fundos quaisquer"},
+  {codigo:"16.01",desc:"Serviços de transporte de natureza municipal"},
+  {codigo:"17.01",desc:"Assessoria ou consultoria de qualquer natureza"},
+  {codigo:"17.02",desc:"Datilografia, digitação, estenografia, expediente"},
+  {codigo:"17.03",desc:"Planejamento, coordenação, programação ou organização técnica"},
+  {codigo:"17.04",desc:"Recrutamento, agenciamento, seleção e colocação de mão-de-obra"},
+  {codigo:"17.05",desc:"Fornecimento de mão-de-obra, mesmo em caráter temporário"},
+  {codigo:"17.06",desc:"Propaganda e publicidade"},
+  {codigo:"17.07",desc:"Franquia (franchising)"},
+  {codigo:"17.08",desc:"Perícias, laudos, exames técnicos e análises técnicas"},
+  {codigo:"17.09",desc:"Planejamento, organização e administração de feiras, exposições"},
+  {codigo:"17.10",desc:"Organização de festas e recepções; bufê"},
+  {codigo:"17.11",desc:"Administração em geral"},
+  {codigo:"17.12",desc:"Leilão e congêneres"},
+  {codigo:"17.13",desc:"Advocacia"},
+  {codigo:"17.14",desc:"Arbitragem de qualquer espécie"},
+  {codigo:"17.15",desc:"Auditoria"},
+  {codigo:"17.16",desc:"Análise de Organização e Métodos"},
+  {codigo:"17.17",desc:"Atuária e cálculos técnicos de qualquer natureza"},
+  {codigo:"17.18",desc:"Contabilidade, inclusive serviços técnicos e auxiliares"},
+  {codigo:"17.19",desc:"Consultoria e assessoria econômica ou financeira"},
+  {codigo:"17.20",desc:"Estatística"},
+  {codigo:"17.21",desc:"Cobrança em geral"},
+  {codigo:"17.22",desc:"Assessoria, análise, avaliação, atendimento, consulta, cadastro"},
+  {codigo:"17.23",desc:"Apresentação de palestras, conferências, seminários"},
+  {codigo:"17.24",desc:"Inserção de textos, desenhos e outros materiais de propaganda"},
+  {codigo:"18.01",desc:"Serviços de regulação de sinistros vinculados a contratos de seguros"},
+  {codigo:"19.01",desc:"Serviços prestados mediante locação, cessão de uso e congêneres"},
+  {codigo:"20.01",desc:"Serviços portuários, ferroportuários, utilização de porto"},
+  {codigo:"21.01",desc:"Serviços de registros públicos, cartorários e notariais"},
+  {codigo:"22.01",desc:"Serviços de exploração de rodovias"},
+  {codigo:"23.01",desc:"Serviços de programação e comunicação visual"},
+  {codigo:"24.01",desc:"Serviços de chaveiros, confecção de carimbos"},
+  {codigo:"25.01",desc:"Funerais, inclusive fornecimento de caixão, urna ou esquifes"},
+  {codigo:"26.01",desc:"Serviços de coleta, remessa ou entrega de correspondências"},
+  {codigo:"27.01",desc:"Serviços de assistência social"},
+  {codigo:"28.01",desc:"Serviços de avaliação de bens e serviços de qualquer natureza"},
+  {codigo:"29.01",desc:"Serviços de biblioteconomia"},
+  {codigo:"30.01",desc:"Serviços de biologia, biotecnologia e química"},
+  {codigo:"31.01",desc:"Serviços técnicos em edificações, eletrônica, eletrotécnica"},
+  {codigo:"32.01",desc:"Serviços de desenhos técnicos"},
+  {codigo:"33.01",desc:"Serviços de desembaraço aduaneiro, comissários, despachantes"},
+  {codigo:"34.01",desc:"Serviços de investigações particulares, detetives e congêneres"},
+  {codigo:"35.01",desc:"Serviços de reportagem, assessoria de imprensa, jornalismo"},
+  {codigo:"36.01",desc:"Serviços de meteorologia"},
+  {codigo:"37.01",desc:"Serviços de artistas, atletas, modelos e manequins"},
+  {codigo:"38.01",desc:"Serviços de museologia"},
+  {codigo:"39.01",desc:"Serviços de ourivesaria e lapidação"},
+  {codigo:"40.01",desc:"Obras de arte sob encomenda"},
+];
+
 function NotasFiscaisTab({user,clients}){
   const[sel,setSel]=useState(user.role==="cliente"?user.id:(clients[0]?.id||""));
   const[mes,setMes]=useState(MES_DEF);
@@ -621,6 +734,12 @@ function NotasFiscaisTab({user,clients}){
   const notaRef=useRef();
   const[showNfse,setShowNfse]=useState(false);
   const[nfseForm,setNfseForm]=useState({tomador_nome:"",tomador_cnpj:"",tomador_email:"",servico_descricao:"",servico_valor:"",servico_codigo:"",servico_iss:""});
+  const[buscaServico,setBuscaServico]=useState("");
+  const[showSugestoes,setShowSugestoes]=useState(false);
+  const sugestoes=buscaServico.length>=2?SERVICOS_LC116.filter(s=>
+    s.desc.toLowerCase().includes(buscaServico.toLowerCase())||
+    s.codigo.includes(buscaServico)
+  ).slice(0,8):[];
   const[nfseLoading,setNfseLoading]=useState(false);
 
   const clienteAtual=clients.find(c=>c.id===sel);
@@ -735,8 +854,34 @@ function NotasFiscaisTab({user,clients}){
             <div><FieldLabel text="Descrição do Serviço *"/><TxtIn value={nfseForm.servico_descricao} onChange={e=>setNfseForm({...nfseForm,servico_descricao:e.target.value})} placeholder="Descrição dos serviços prestados"/></div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
               <div><FieldLabel text="Valor (R$) *"/><TxtIn value={nfseForm.servico_valor} onChange={e=>setNfseForm({...nfseForm,servico_valor:e.target.value})} placeholder="0,00"/></div>
-              <div><FieldLabel text="Cód. Serviço"/><TxtIn value={nfseForm.servico_codigo} onChange={e=>setNfseForm({...nfseForm,servico_codigo:e.target.value})} placeholder="Ex: 17.19"/></div>
-              <div><FieldLabel text="Alíquota ISS %"/><TxtIn value={nfseForm.servico_iss} onChange={e=>setNfseForm({...nfseForm,servico_iss:e.target.value})} placeholder="0,00"/></div>
+              <div style={{position:"relative"}}>
+                <FieldLabel text="Cód. Serviço"/>
+                <input value={buscaServico} onChange={e=>{setBuscaServico(e.target.value);setShowSugestoes(true);}}
+                  onFocus={()=>setShowSugestoes(true)}
+                  placeholder="Digite código ou nome do serviço..."
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit"}}/>
+                {showSugestoes&&sugestoes.length>0&&(
+                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:`1px solid ${C.border}`,zIndex:999,maxHeight:200,overflowY:"auto"}}>
+                    {sugestoes.map(s=>(
+                      <button key={s.codigo} onClick={()=>{
+                        setNfseForm({...nfseForm,servico_codigo:s.codigo,servico_descricao:s.desc,servico_iss:clienteAtual?.nfse_aliquota||""});
+                        setBuscaServico(s.codigo+" — "+s.desc);
+                        setShowSugestoes(false);
+                      }} style={{display:"block",width:"100%",textAlign:"left",padding:"10px 14px",border:"none",background:"transparent",cursor:"pointer",fontSize:12,borderBottom:`1px solid ${C.border}`}}>
+                        <span style={{fontWeight:700,color:C.gold}}>{s.codigo}</span>
+                        <span style={{color:C.text,marginLeft:8}}>{s.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <FieldLabel text="Alíquota ISS %"/>
+                <input value={nfseForm.servico_iss} onChange={e=>setNfseForm({...nfseForm,servico_iss:e.target.value})}
+                  placeholder="0,00" readOnly={false}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit",background:C.bgAlt}}/>
+                {clienteAtual?.nfse_aliquota&&<div style={{fontSize:11,color:C.muted,marginTop:3}}>Padrão configurado: {clienteAtual.nfse_aliquota}%</div>}
+              </div>
             </div>
           </div>
           <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>

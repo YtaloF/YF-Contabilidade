@@ -73,6 +73,7 @@ export async function upsertClient(client) {
     nfse_usuario:    client.nfse_usuario   || null,
     nfse_senha:      client.nfse_senha     || null,
     nfse_token:      client.nfse_token     || null,
+    nfse_aliquota:   client.nfse_aliquota  || null,
   };
   return check(await supabase.from("clients").upsert(row).select().single());
 }
