@@ -36,9 +36,8 @@ exports.handler = async (event) => {
           cep: (tomador.cep || "28900000").replace(/\D/g, ""),
         },
         ...(tomador.email ? { email: tomador.email } : {}),
-        ...(tomador.telefone ? { telefone: tomador.telefone } : {}),
-        ...(cnpjTomador.length === 14 ? { cnpj: tomador.cnpj } : {}),
-        ...(cnpjTomador.length === 11 ? { cpf: tomador.cnpj } : {}),
+        ...(cnpjTomador.length === 14 ? { cnpj: cnpjTomador } : {}),
+        ...(cnpjTomador.length === 11 ? { cpf: cnpjTomador } : {}),
       },
       servico: {
         discriminacao: servico.descricao || "Serviços prestados",
@@ -46,7 +45,6 @@ exports.handler = async (event) => {
         item_lista_servico: (servico.codigo || "17.18").split(/[—–-]/)[0].trim(),
         codigo_cnae: (servico.cnae || "6920601").replace(/\D/g, ""),
         iss_retido: false,
-        ...(servico.iss ? { aliquota: Number(servico.iss) / 100 } : {}),
       },
     };
 
@@ -55,8 +53,14 @@ exports.handler = async (event) => {
       "Accept": "application/json",
     };
 
-    if (token)                 headers["Authorization"] = `Bearer ${token}`;
-    else if (usuario && senha) headers["Authorization"] = "Basic " + Buffer.from(`${usuario}:${senha}`).toString("base64");
+    // Tentar múltiplos formatos de autenticação
+    if (usuario && senha) {
+      headers["Authorization"] = "Basic " + Buffer.from(`${usuario}:${senha}`).toString("base64");
+    }
+    if (token) {
+      headers["token"] = token; // Header customizado comum em prefeituras
+      headers["Authorization"] = `Bearer ${token}`;
+    }
 
     console.log("Enviando DPS:", JSON.stringify(dps, null, 2));
 
