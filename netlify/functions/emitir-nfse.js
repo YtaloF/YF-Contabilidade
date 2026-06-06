@@ -1,5 +1,6 @@
 // Netlify Function: emitir-nfse.js
-// NFS-e Cabo Frio/RJ — Modernização Pública — formato ABRASF próprio
+// NFS-e Cabo Frio/RJ — ModernizacaoPublica — formato ABRASF próprio
+// Schema confirmado via Focus NFe: https://focusnfe.com.br/guides/nfse/municipios-integrados/cabo-frio-rj/
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -14,37 +15,38 @@ exports.handler = async (event) => {
     const dataEmissao = new Date().toISOString().slice(0, 19) + "-0300";
     const cnpjTomador = (tomador.cnpj || "").replace(/\D/g, "");
 
-    // Formato ABRASF próprio de Cabo Frio (via Modernização Pública)
+    // Formato exato confirmado para Cabo Frio/RJ
     const dps = {
       data_emissao: dataEmissao,
       natureza_operacao: 1,
-      optante_simples_nacional: true,
+      optante_simples_nacional: prestador.simples_nacional !== false,
       prestador: {
         cnpj: (prestador.cnpj || "").replace(/\D/g, ""),
         inscricao_municipal: prestador.insc_municipal || "",
-        codigo_municipio: 3300704, // código IBGE de Cabo Frio
+        codigo_municipio: 3300704, // Cabo Frio/RJ
       },
       tomador: {
         razao_social: tomador.nome || "Consumidor Final",
         endereco: {
           logradouro: tomador.logradouro || "Não informado",
           numero: tomador.numero || "S/N",
-          bairro: tomador.bairro || "Não informado",
-          codigo_municipio: tomador.codigo_municipio || 3300704,
+          bairro: tomador.bairro || "Centro",
+          codigo_municipio: 3300704,
           uf: tomador.uf || "RJ",
           cep: (tomador.cep || "28900000").replace(/\D/g, ""),
         },
         ...(tomador.email ? { email: tomador.email } : {}),
-        ...(cnpjTomador.length === 14 ? { cnpj: cnpjTomador } : {}),
-        ...(cnpjTomador.length === 11 ? { cpf: cnpjTomador } : {}),
+        ...(tomador.telefone ? { telefone: tomador.telefone } : {}),
+        ...(cnpjTomador.length === 14 ? { cnpj: tomador.cnpj } : {}),
+        ...(cnpjTomador.length === 11 ? { cpf: tomador.cnpj } : {}),
       },
       servico: {
         discriminacao: servico.descricao || "Serviços prestados",
         valor_servicos: Number(servico.valor || 0),
-        item_lista_servico: servico.codigo || "17.18",
-        codigo_cnae: servico.cnae || "6920601",
+        item_lista_servico: (servico.codigo || "17.18").split("—")[0].trim(),
+        codigo_cnae: (servico.cnae || "6920601").replace(/\D/g, ""),
         iss_retido: false,
-        aliquota: Number(servico.iss || 0) / 100,
+        ...(servico.iss ? { aliquota: Number(servico.iss) / 100 } : {}),
       },
     };
 
@@ -53,8 +55,10 @@ exports.handler = async (event) => {
       "Accept": "application/json",
     };
 
-    if (token)              headers["Authorization"] = `Bearer ${token}`;
+    if (token)                 headers["Authorization"] = `Bearer ${token}`;
     else if (usuario && senha) headers["Authorization"] = "Basic " + Buffer.from(`${usuario}:${senha}`).toString("base64");
+
+    console.log("Enviando DPS:", JSON.stringify(dps, null, 2));
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -63,6 +67,8 @@ exports.handler = async (event) => {
     });
 
     const responseText = await response.text();
+    console.log("Resposta:", response.status, responseText);
+
     let responseData;
     try { responseData = JSON.parse(responseText); } catch { responseData = { raw: responseText }; }
 
@@ -71,6 +77,7 @@ exports.handler = async (event) => {
         statusCode: 400,
         body: JSON.stringify({
           error: responseData?.mensagem || responseData?.message || responseData?.erro || "Erro ao emitir NFS-e",
+          codigo: responseData?.erro,
           status: response.status,
           detalhe: responseData,
         })
@@ -85,6 +92,7 @@ exports.handler = async (event) => {
     };
 
   } catch (err) {
+    console.error("Erro:", err);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
