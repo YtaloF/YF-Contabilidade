@@ -1006,8 +1006,8 @@ function ChatTab({user,clients,onNewMessage}){
 
   async function send(){
     if(!msg.trim()&&pf.length===0) return;
-    const m=await sendMessage(sel,user.role==="contador"?"contador":"cliente",msg.trim(),pf);
-    setMsgs(p=>[...p,m]); setMsg(""); setPf([]);
+    await sendMessage(sel,user.role==="contador"?"contador":"cliente",msg.trim(),pf);
+    setMsg(""); setPf([]);
   }
 
   return (
@@ -1191,13 +1191,15 @@ export default function App(){
   // Badge de chat: detectar novas mensagens quando cliente NAO esta na aba chat
   useEffect(()=>{
     if(!user||user.role!=="cliente") return;
-    if(activeTab==="chat") return; // nao subscrever se ja esta no chat
     const ch=supabase.channel("badge-chat-"+user.id)
-      .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`client_id=eq.${user.id}`},()=>{
-        setUnreadChat(p=>p+1);
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`client_id=eq.${user.id}`},(payload)=>{
+        // Só incrementa se a msg foi enviada pelo contador e cliente nao esta no chat
+        if(payload.new?.sender==="contador" && activeTabRef.current!=="chat"){
+          setUnreadChat(p=>p+1);
+        }
       }).subscribe();
     return ()=>supabase.removeChannel(ch);
-  },[user,activeTab]);
+  },[user]);
 
   async function handleLogin(u){
     setUser(u);
