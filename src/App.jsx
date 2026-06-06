@@ -733,7 +733,7 @@ function NotasFiscaisTab({user,clients}){
   const[comps,setComps]=useState([]);
   const notaRef=useRef();
   const[showNfse,setShowNfse]=useState(false);
-  const[nfseForm,setNfseForm]=useState({tomador_nome:"",tomador_cnpj:"",tomador_email:"",servico_descricao:"",servico_valor:"",servico_codigo:"",servico_iss:""});
+  const[nfseForm,setNfseForm]=useState({tomador_nome:"",tomador_cnpj:"",tomador_email:"",tomador_logradouro:"",tomador_numero:"",tomador_bairro:"",tomador_cep:"",tomador_uf:"RJ",servico_descricao:"",servico_valor:"",servico_codigo:"",servico_cnae:"",servico_iss:""});
   const[buscaServico,setBuscaServico]=useState("");
   const[showSugestoes,setShowSugestoes]=useState(false);
   const sugestoes=buscaServico.length>=2?SERVICOS_LC116.filter(s=>
@@ -758,8 +758,8 @@ function NotasFiscaisTab({user,clients}){
           senha: clienteAtual.nfse_senha,
           token: clienteAtual.nfse_token,
           prestador: { razao_social: clienteAtual.name, cnpj: clienteAtual.cnpj, insc_municipal: clienteAtual.insc_municipal },
-          tomador: { nome: nfseForm.tomador_nome, cnpj: nfseForm.tomador_cnpj, email: nfseForm.tomador_email },
-          servico: { descricao: nfseForm.servico_descricao, valor: parseFloat(nfseForm.servico_valor)||0, codigo: nfseForm.servico_codigo, iss: parseFloat(nfseForm.servico_iss)||0 },
+          tomador: { nome: nfseForm.tomador_nome, cnpj: nfseForm.tomador_cnpj, email: nfseForm.tomador_email, logradouro: nfseForm.tomador_logradouro, numero: nfseForm.tomador_numero, bairro: nfseForm.tomador_bairro, cep: nfseForm.tomador_cep, uf: nfseForm.tomador_uf },
+          servico: { descricao: nfseForm.servico_descricao, valor: parseFloat(nfseForm.servico_valor)||0, codigo: nfseForm.servico_codigo, iss: parseFloat(nfseForm.servico_iss)||0, cnae: nfseForm.servico_cnae },
           competencia: mes,
         })
       });
@@ -849,6 +849,15 @@ function NotasFiscaisTab({user,clients}){
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <div><FieldLabel text="CNPJ/CPF"/><TxtIn value={nfseForm.tomador_cnpj} onChange={e=>setNfseForm({...nfseForm,tomador_cnpj:e.target.value})} placeholder="00.000.000/0001-00"/></div>
               <div><FieldLabel text="E-mail"/><TxtIn value={nfseForm.tomador_email} onChange={e=>setNfseForm({...nfseForm,tomador_email:e.target.value})} placeholder="email@empresa.com"/></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10}}>
+              <div><FieldLabel text="Logradouro *"/><TxtIn value={nfseForm.tomador_logradouro} onChange={e=>setNfseForm({...nfseForm,tomador_logradouro:e.target.value})} placeholder="Rua, Av..."/></div>
+              <div><FieldLabel text="Número"/><TxtIn value={nfseForm.tomador_numero} onChange={e=>setNfseForm({...nfseForm,tomador_numero:e.target.value})} placeholder="123"/></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+              <div><FieldLabel text="Bairro *"/><TxtIn value={nfseForm.tomador_bairro} onChange={e=>setNfseForm({...nfseForm,tomador_bairro:e.target.value})} placeholder="Bairro"/></div>
+              <div><FieldLabel text="CEP"/><TxtIn value={nfseForm.tomador_cep} onChange={e=>setNfseForm({...nfseForm,tomador_cep:e.target.value})} placeholder="00000-000"/></div>
+              <div><FieldLabel text="UF"/><TxtIn value={nfseForm.tomador_uf} onChange={e=>setNfseForm({...nfseForm,tomador_uf:e.target.value})} placeholder="RJ"/></div>
             </div>
             <div style={{fontWeight:600,fontSize:12,color:C.muted,textTransform:"uppercase",letterSpacing:0.5,marginTop:4}}>Serviço</div>
             <div><FieldLabel text="Descrição do Serviço *"/><TxtIn value={nfseForm.servico_descricao} onChange={e=>setNfseForm({...nfseForm,servico_descricao:e.target.value})} placeholder="Descrição dos serviços prestados"/></div>

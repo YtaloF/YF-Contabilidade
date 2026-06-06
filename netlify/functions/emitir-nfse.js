@@ -1,5 +1,5 @@
 // Netlify Function: emitir-nfse.js
-// NFS-e Cabo Frio — Modernização Pública — envio via DPS (REST/JSON)
+// NFS-e Cabo Frio/RJ — Modernização Pública — formato ABRASF próprio
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -11,54 +11,40 @@ exports.handler = async (event) => {
 
     if (!endpoint) return { statusCode: 400, body: JSON.stringify({ error: "Endpoint não configurado" }) };
 
-    const dataEmissao = new Date().toISOString().split("T")[0];
-    const [ano, mes] = (competencia || dataEmissao.substring(0, 7)).split("-");
-    const competenciaFormatada = `${ano}-${mes}-01`;
+    const dataEmissao = new Date().toISOString().slice(0, 19) + "-0300";
+    const cnpjTomador = (tomador.cnpj || "").replace(/\D/g, "");
 
-    // DPS — formato Modernização Pública (Cabo Frio)
+    // Formato ABRASF próprio de Cabo Frio (via Modernização Pública)
     const dps = {
-      infDPS: {
-        tpAmb: "1", // 1=Produção, 2=Homologação
-        dhEmi: new Date().toISOString(),
-        verAplic: "1.00",
-        serie: "A",
-        nDPS: String(Date.now()).slice(-6),
-        dCompet: competenciaFormatada,
-        prest: {
-          CNPJ: (prestador.cnpj || "").replace(/\D/g, ""),
-          IM: prestador.insc_municipal || "",
-          xNome: prestador.razao_social || "",
+      data_emissao: dataEmissao,
+      natureza_operacao: 1,
+      optante_simples_nacional: true,
+      prestador: {
+        cnpj: (prestador.cnpj || "").replace(/\D/g, ""),
+        inscricao_municipal: prestador.insc_municipal || "",
+        codigo_municipio: 3300704, // código IBGE de Cabo Frio
+      },
+      tomador: {
+        razao_social: tomador.nome || "Consumidor Final",
+        endereco: {
+          logradouro: tomador.logradouro || "Não informado",
+          numero: tomador.numero || "S/N",
+          bairro: tomador.bairro || "Não informado",
+          codigo_municipio: tomador.codigo_municipio || 3300704,
+          uf: tomador.uf || "RJ",
+          cep: (tomador.cep || "28900000").replace(/\D/g, ""),
         },
-        toma: tomador.cnpj
-          ? {
-              [(tomador.cnpj.replace(/\D/g, "").length === 11) ? "CPF" : "CNPJ"]:
-                tomador.cnpj.replace(/\D/g, ""),
-              xNome: tomador.nome || "",
-              email: tomador.email || undefined,
-            }
-          : { xNome: tomador.nome || "Consumidor Final" },
-        serv: {
-          cServ: {
-            cTribNac: servico.codigo || "010101",
-            xDescServ: servico.descricao || "Serviços contábeis",
-          },
-          vServPrest: {
-            vReceb: Number(servico.valor || 0).toFixed(2),
-          },
-          tribServ: {
-            tribMun: {
-              tribISSQN: "1",
-              cNatOp: "1",
-              BM: {
-                vBC: Number(servico.valor || 0).toFixed(2),
-                pAliq: Number(servico.iss || 0).toFixed(4),
-              },
-            },
-            totTrib: {
-              vTotTrib: (Number(servico.valor || 0) * Number(servico.iss || 0) / 100).toFixed(2),
-            },
-          },
-        },
+        ...(tomador.email ? { email: tomador.email } : {}),
+        ...(cnpjTomador.length === 14 ? { cnpj: cnpjTomador } : {}),
+        ...(cnpjTomador.length === 11 ? { cpf: cnpjTomador } : {}),
+      },
+      servico: {
+        discriminacao: servico.descricao || "Serviços prestados",
+        valor_servicos: Number(servico.valor || 0),
+        item_lista_servico: servico.codigo || "17.18",
+        codigo_cnae: servico.cnae || "6920601",
+        iss_retido: false,
+        aliquota: Number(servico.iss || 0) / 100,
       },
     };
 
@@ -67,12 +53,8 @@ exports.handler = async (event) => {
       "Accept": "application/json",
     };
 
-    // Autenticação: token Bearer ou Basic
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    } else if (usuario && senha) {
-      headers["Authorization"] = "Basic " + Buffer.from(`${usuario}:${senha}`).toString("base64");
-    }
+    if (token)              headers["Authorization"] = `Bearer ${token}`;
+    else if (usuario && senha) headers["Authorization"] = "Basic " + Buffer.from(`${usuario}:${senha}`).toString("base64");
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -88,31 +70,21 @@ exports.handler = async (event) => {
       return {
         statusCode: 400,
         body: JSON.stringify({
-          error: responseData?.xMotivo || responseData?.message || responseData?.raw || "Erro ao emitir NFS-e",
+          error: responseData?.mensagem || responseData?.message || responseData?.erro || "Erro ao emitir NFS-e",
           status: response.status,
           detalhe: responseData,
         })
       };
     }
 
-    // Extrair número da NFS-e da resposta
-    const numero = responseData?.nNFSe || responseData?.numero || responseData?.infNFSe?.nNFSe || "—";
-    const chave  = responseData?.cLocEmi || responseData?.infNFSe?.cLocEmi || "";
+    const numero = responseData?.numero_nfse || responseData?.nNFSe || responseData?.numero || "—";
 
     return {
       statusCode: 200,
-      body: JSON.stringify({
-        sucesso: true,
-        numero,
-        chave,
-        resposta: responseData,
-      })
+      body: JSON.stringify({ sucesso: true, numero, resposta: responseData })
     };
 
   } catch (err) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: err.message })
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
