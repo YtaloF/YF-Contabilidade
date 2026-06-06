@@ -1156,6 +1156,7 @@ function ChangePwModal({current,onSave,onClose}){
 export default function App(){
   const[user,setUser]=useState(null);
   const[activeTab,setActiveTab]=useState("clientes");
+  const activeTabRef=useRef("clientes");
   const[unreadChat,setUnreadChat]=useState(0);
   const[clients,setClients]=useState([]);
   const[loading,setLoading]=useState(false);
@@ -1182,11 +1183,13 @@ export default function App(){
 
   useEffect(()=>{ if(user) fetchClients().then(setClients); },[user]);
 
+  useEffect(()=>{ activeTabRef.current=activeTab; },[activeTab]);
+
   // Detectar novas mensagens no chat para o cliente
   useEffect(()=>{
     if(!user||user.role!=="cliente") return;
     const ch=subscribeChat(user.id, ()=>{
-      setUnreadChat(p=>activeTab==="chat"?0:p+1);
+      setUnreadChat(p=>activeTabRef.current==="chat"?0:p+1);
     });
     return ()=>{ try{ch.unsubscribe();}catch(e){} };
   },[user]);
