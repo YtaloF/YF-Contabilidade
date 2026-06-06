@@ -415,6 +415,25 @@ function CadastroTab({user,clients,setClients}){
               </div>
             </Card>
           )}
+          {user.role==="contador"&&(
+            <Card style={{padding:20,background:"#F0F7FF",border:"1px solid #B0D0F0"}}>
+              <SecH text="Configuração NFS-e" color="#2563EB"/>
+              {editMode?(
+                <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:8}}>
+                  {[["Endpoint (URL Webservice)","nfse_endpoint"],["Usuário","nfse_usuario"],["Senha","nfse_senha"],["Token","nfse_token"]].map(([l,k])=>(
+                    <div key={k}><FieldLabel text={l}/><TxtIn value={form[k]||""} onChange={e=>setForm({...form,[k]:e.target.value})}/></div>
+                  ))}
+                </div>
+              ):(
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:8}}>
+                  {[["Endpoint",client.nfse_endpoint],["Usuário",client.nfse_usuario],["Senha",client.nfse_senha],["Token",client.nfse_token]].map(([l,v])=>(
+                    <div key={l}><div style={{fontSize:10,color:C.muted,fontWeight:600,textTransform:"uppercase",marginBottom:3}}>{l}</div><div style={{fontSize:13,color:v?C.text:C.muted,fontFamily:l!=="Endpoint"?"monospace":"inherit",wordBreak:"break-all"}}>{v||"—"}</div></div>
+                  ))}
+                  {!client.nfse_endpoint&&<div style={{gridColumn:"1/-1",fontSize:12,color:C.muted,fontStyle:"italic"}}>Clique em Editar para configurar o webservice NFS-e</div>}
+                </div>
+              )}
+            </Card>
+          )}
           <Card style={{padding:20}}>
             <SecH text="Documentos"/>
             <input ref={certRef} type="file" style={{display:"none"}} onChange={e=>{if(e.target.files[0])setArq("cert_digital",e.target.files[0]);}}/>
@@ -594,6 +613,39 @@ function NotasFiscaisTab({user,clients}){
   const[loading,setLoading]=useState(false);
   const[comps,setComps]=useState([]);
   const notaRef=useRef();
+  const[showNfse,setShowNfse]=useState(false);
+  const[nfseForm,setNfseForm]=useState({tomador_nome:"",tomador_cnpj:"",tomador_email:"",servico_descricao:"",servico_valor:"",servico_codigo:"",servico_iss:""});
+  const[nfseLoading,setNfseLoading]=useState(false);
+
+  const clienteAtual=clients.find(c=>c.id===sel);
+
+  async function emitirNfse(){
+    if(!clienteAtual?.nfse_endpoint){ alert("Configure o webservice NFS-e no Cadastro desta empresa primeiro."); return; }
+    if(!nfseForm.tomador_nome||!nfseForm.servico_valor){ alert("Preencha pelo menos o nome do tomador e o valor do serviço."); return; }
+    setNfseLoading(true);
+    try{
+      const resp = await fetch("/.netlify/functions/emitir-nfse", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          endpoint: clienteAtual.nfse_endpoint,
+          usuario: clienteAtual.nfse_usuario,
+          senha: clienteAtual.nfse_senha,
+          token: clienteAtual.nfse_token,
+          prestador: { razao_social: clienteAtual.name, cnpj: clienteAtual.cnpj, insc_municipal: clienteAtual.insc_municipal },
+          tomador: { nome: nfseForm.tomador_nome, cnpj: nfseForm.tomador_cnpj, email: nfseForm.tomador_email },
+          servico: { descricao: nfseForm.servico_descricao, valor: parseFloat(nfseForm.servico_valor)||0, codigo: nfseForm.servico_codigo, iss: parseFloat(nfseForm.servico_iss)||0 },
+          competencia: mes,
+        })
+      });
+      const data = await resp.json();
+      if(!resp.ok) throw new Error(data.error||"Erro ao emitir NFS-e");
+      alert("NFS-e emitida com sucesso! Número: "+(data.numero||"—"));
+      setShowNfse(false);
+      setNfseForm({tomador_nome:"",tomador_cnpj:"",tomador_email:"",servico_descricao:"",servico_valor:"",servico_codigo:"",servico_iss:""});
+    }catch(e){ alert("Erro: "+e.message); }
+    setNfseLoading(false);
+  }
 
   useEffect(()=>{
     if(!sel) return;
@@ -627,6 +679,7 @@ function NotasFiscaisTab({user,clients}){
     <div>
       <PgH title="Notas Fiscais" action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
         {user.role==="contador"&&<div style={{width:130}}><CliSel clients={clients} value={sel} onChange={setSel}/></div>}
+        {user.role==="contador"&&<button onClick={()=>setShowNfse(true)} style={{padding:"6px 12px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#2563EB,#1D4ED8)",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>⚡ Emitir NFS-e</button>}
       </div>}/>
       {user.role==="contador"&&<CompetenciasPanel clientId={sel} modulo="notas" label="Competências — Notas Fiscais"/>}
       {comps.length>0
@@ -659,6 +712,36 @@ function NotasFiscaisTab({user,clients}){
             </Card>
           ))}
         </div>
+      )}
+      {showNfse&&(
+        <ModalBox onClose={()=>setShowNfse(false)}>
+          <div style={{marginBottom:16}}>
+            <div style={{fontWeight:700,fontSize:16,color:C.text,marginBottom:4}}>⚡ Emitir NFS-e</div>
+            <div style={{fontSize:12,color:C.muted}}>Prestador: {clienteAtual?.name} — Competência: {mesIdLabel(mes)}</div>
+            {!clienteAtual?.nfse_endpoint&&<div style={{background:"#FEF3C7",border:"1px solid #F59E0B",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#92400E",marginTop:8}}>⚠️ Webservice NFS-e não configurado. Acesse Cadastro → Editar para adicionar os dados.</div>}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{fontWeight:600,fontSize:12,color:C.muted,textTransform:"uppercase",letterSpacing:0.5}}>Tomador do Serviço</div>
+            <div><FieldLabel text="Nome / Razão Social *"/><TxtIn value={nfseForm.tomador_nome} onChange={e=>setNfseForm({...nfseForm,tomador_nome:e.target.value})} placeholder="Nome do tomador"/></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div><FieldLabel text="CNPJ/CPF"/><TxtIn value={nfseForm.tomador_cnpj} onChange={e=>setNfseForm({...nfseForm,tomador_cnpj:e.target.value})} placeholder="00.000.000/0001-00"/></div>
+              <div><FieldLabel text="E-mail"/><TxtIn value={nfseForm.tomador_email} onChange={e=>setNfseForm({...nfseForm,tomador_email:e.target.value})} placeholder="email@empresa.com"/></div>
+            </div>
+            <div style={{fontWeight:600,fontSize:12,color:C.muted,textTransform:"uppercase",letterSpacing:0.5,marginTop:4}}>Serviço</div>
+            <div><FieldLabel text="Descrição do Serviço *"/><TxtIn value={nfseForm.servico_descricao} onChange={e=>setNfseForm({...nfseForm,servico_descricao:e.target.value})} placeholder="Descrição dos serviços prestados"/></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+              <div><FieldLabel text="Valor (R$) *"/><TxtIn value={nfseForm.servico_valor} onChange={e=>setNfseForm({...nfseForm,servico_valor:e.target.value})} placeholder="0,00"/></div>
+              <div><FieldLabel text="Cód. Serviço"/><TxtIn value={nfseForm.servico_codigo} onChange={e=>setNfseForm({...nfseForm,servico_codigo:e.target.value})} placeholder="Ex: 17.19"/></div>
+              <div><FieldLabel text="Alíquota ISS %"/><TxtIn value={nfseForm.servico_iss} onChange={e=>setNfseForm({...nfseForm,servico_iss:e.target.value})} placeholder="0,00"/></div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
+            <BtnOut onClick={()=>setShowNfse(false)}>Cancelar</BtnOut>
+            <button onClick={emitirNfse} disabled={nfseLoading} style={{padding:"10px 20px",borderRadius:8,border:"none",background:nfseLoading?"#ccc":"linear-gradient(135deg,#2563EB,#1D4ED8)",color:"#fff",fontSize:13,fontWeight:700,cursor:nfseLoading?"not-allowed":"pointer"}}>
+              {nfseLoading?"⏳ Emitindo...":"⚡ Emitir NFS-e"}
+            </button>
+          </div>
+        </ModalBox>
       )}
     </div>
   );
