@@ -369,7 +369,9 @@ function CadastroTab({user,clients,setClients}){
 
   async function setArq(key,file){
     const path = await uploadArquivo(client.id,"documentos",file);
-    const updated = await upsertClient({...client,[key]:file.name,[key+"_path"]:path});
+    // Salvar o path completo no campo principal (usado para buscar o arquivo)
+    // e o nome do arquivo em _name para exibição
+    const updated = await upsertClient({...client,[key]:path,[key+"_name"]:file.name});
     setClients(p=>p.map(c=>c.id===updated.id?updated:c));
   }
 
@@ -446,15 +448,15 @@ function CadastroTab({user,clients,setClients}){
             <input ref={contratoRef} type="file" accept=".pdf,.docx" style={{display:"none"}} onChange={e=>{if(e.target.files[0])setArq("contrato",e.target.files[0]);}}/>
             <input ref={contratoSocRef} type="file" accept=".pdf,.docx" style={{display:"none"}} onChange={e=>{if(e.target.files[0])setArq("contrato_social",e.target.files[0]);}}/>
             {[["Certificado Digital","cert_digital"],["Contrato de Serviços","contrato"],["Contrato Social","contrato_social"]].map(([l,k])=>(
-              <div key={k} style={{background:client[k]?C.surfaceAlt:"#FFF8F0",borderRadius:8,padding:"12px 14px",border:`1px solid ${client[k]?C.border:"#F0D080"}`,marginBottom:10}}>
+              <div key={k} style={{background:(client[k]||client[k+"_name"])?C.surfaceAlt:"#FFF8F0",borderRadius:8,padding:"12px 14px",border:`1px solid ${(client[k]||client[k+"_name"])?C.border:"#F0D080"}`,marginBottom:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontWeight:600,fontSize:13,color:C.text,marginBottom:6}}>{l}</div>
-                    {client[k]?<FileChip name={client[k]} path={client[k+"_path"]} modulo="documentos"/>:<div style={{fontSize:12,color:C.muted}}>Nenhum arquivo</div>}
+                    {client[k]?<FileChip name={client[k+"_name"]||client[k].split("/").pop()} path={client[k]} modulo="documentos"/>:<div style={{fontSize:12,color:C.muted}}>Nenhum arquivo</div>}
                   </div>
                   <div style={{display:"flex",gap:8,marginLeft:12,flexShrink:0}}>
-                    {client[k]&&<BtnView name={client[k]} path={client[k+"_path"]} modulo="documentos" sm/>}
-                    {user.role==="contador"&&<BtnOut onClick={()=>({cert_digital:certRef,contrato:contratoRef,contrato_social:contratoSocRef}[k].current?.click())} sm>{client[k]?"🔄 Trocar":"📎 Anexar"}</BtnOut>}
+                    {client[k]&&<BtnView name={client[k+"_name"]||client[k].split("/").pop()} path={client[k]} modulo="documentos" sm/>}
+                    {user.role==="contador"&&<BtnOut onClick={()=>({cert_digital:certRef,contrato:contratoRef,contrato_social:contratoSocRef}[k].current?.click())} sm>{(client[k]||client[k+"_name"])?"🔄 Trocar":"📎 Anexar"}</BtnOut>}
                   </div>
                 </div>
               </div>
