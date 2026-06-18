@@ -291,14 +291,63 @@ exports.handler = async (event) => {
             emitida_em:     new Date().toISOString(),
           });
 
-          const linkNota = data.caminho_danfse || data.url || 'Em processamento — acesse o portal da prefeitura em breve.';
+          const linkNota = data.caminho_danfse || data.url || null;
+
+          // Mensagem de sucesso
           await sendMessage(phone,
             `✅ *NFS-e emitida com sucesso!*\n\n` +
             `📋 *Referência:* ${data.ref || 'N/A'}\n` +
             `👤 *Tomador:* ${dados.tomador_nome}\n` +
             `💰 *Valor:* R$ ${Number(dados.valor).toFixed(2)}\n` +
             `📅 *Data:* ${dados.data_emissao_display}\n\n` +
-            `🔗 *Link da nota:*\n${linkNota}\n\n` +
+            `📄 Aguarde, estou buscando o PDF da nota...`
+          );
+
+          // Busca o PDF na Focus NFe (pode levar alguns segundos para ficar disponível)
+          await new Promise(r => setTimeout(r, 4000)); // aguarda 4s para a Focus processar
+
+          try {
+            const pdfResp = await fetch(
+              `https://api.focusnfe.com.br/v2/nfses/${data.ref}?completa=1`,
+              {
+                headers: {
+                  Authorization: `Basic ${Buffer.from(cliente.focus_token + ':').toString('base64')}`,
+                },
+              }
+            );
+            const pdfData = await pdfResp.json();
+            const pdfUrl = pdfData.caminho_danfse || pdfData.danfse_url || null;
+
+            if (pdfUrl) {
+              // Envia o PDF via Z-API como documento
+              await fetch(
+                `https://api.z-api.io/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}/send-document/pdf`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    phone,
+                    document: pdfUrl,
+                    fileName: `NFS-e_${data.ref || 'nota'}.pdf`,
+                    caption: `📄 NFS-e — ${dados.tomador_nome} | R$ ${Number(dados.valor).toFixed(2)}`,
+                  }),
+                }
+              );
+            } else {
+              // Se PDF ainda não disponível, envia o link
+              await sendMessage(phone,
+                `🔗 *Link da nota:*\n${linkNota || 'Acesse o portal da prefeitura para visualizar.'}\n\n` +
+                `_O PDF pode levar alguns minutos para ser gerado pela prefeitura._`
+              );
+            }
+          } catch (pdfErr) {
+            // Se falhar ao buscar PDF, envia só o link
+            if (linkNota) {
+              await sendMessage(phone, `🔗 *Link da nota:*\n${linkNota}`);
+            }
+          }
+
+          await sendMessage(phone,
             `_YF Contabilidade Digital_ 🏆\n\n` +
             `Para emitir outra nota, envie *QUERO EMITIR UMA NOTA*.`
           );
