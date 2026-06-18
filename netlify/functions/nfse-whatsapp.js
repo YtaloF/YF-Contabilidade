@@ -2,7 +2,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const SUPABASE_URL = 'https://yhnpxyvxvqpflczlnrne.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlobnp4eXZ4dnFwZmxjemxucm5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM3ODM4NzIsImV4cCI6MjA1OTM1OTg3Mn0.CJnFgaEBboMEULdahSJdGBXfPHhHWLxeWalEXDaX69U';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlobnB4eXZ4dnFwZmxjemxucm5lIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDMzMzk2OCwiZXhwIjoyMDk1OTA5OTY4fQ._36uVC7FAumHk7XIczT7RZK-LkJVCwWK0NPqB-AybI8';
 const ZAPI_INSTANCE = '3F4D7FA32C5BF1C479CC8645B9B7D1FC';
 const ZAPI_TOKEN    = '2531E47012E94CF7CD551C9F';
 const ZAPI_SEND_URL = `https://api.z-api.io/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}/send-text`;
